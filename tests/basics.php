@@ -41,7 +41,7 @@ class TestMorm extends MormTestCaseWithTableAuthors
     public function testFillIdWhenSave()
     {
         $author = new Authors(array('name' => 'Chuck Norris'));
-        $this->assertEqual(NULL, $authors->id);
+        $this->assertEqual(NULL, $author->id);
         $author->save();
         $this->assertEqual(1, $author->id);
     }

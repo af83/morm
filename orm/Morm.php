@@ -198,8 +198,9 @@ class Morm
         $method_name = 'get'.str_replace(' ', '', ucwords(str_replace('_', ' ', $name)));
         if(method_exists($this, $method_name))
             return $this->$method_name();
-        else
+        else if (isset($this->$name))
             return $this->$name;
+        return NULL;
     }
 
     public function __call ($method, $args)

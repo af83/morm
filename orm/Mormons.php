@@ -693,8 +693,14 @@ class Mormons implements Iterator
     }
 
     /************ Iterator methods **************/
-    public function current(){ 
-        return $this->mormons[$this->mormon_keys[$this->key]]; 
+    public function current()
+    { 
+        if (isset($this->mormon_keys[$this->key]) && 
+            isset($this->mormons[$this->mormon_keys[$this->key]]))
+        {
+            return $this->mormons[$this->mormon_keys[$this->key]]; 
+        }
+        return NULL;
     }
 
     public function key() { 

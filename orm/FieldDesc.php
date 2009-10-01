@@ -11,6 +11,7 @@ class  FieldDesc
     public $php_type = 'string';
     public $values = NULL;
     public $length = NULL;
+    public $Key = NULL;
 
     public function Decorate()
     {
