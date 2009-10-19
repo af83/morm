@@ -376,6 +376,31 @@ class Mormons implements Iterator
     }
 
     /**
+     * paginate 
+     * 
+     * sets offset and limit according to given parameters
+     *
+     * @param integer $page will be used to calculate the offset according to 
+     * the second parameter
+     * @param integer $per_page will set the limit as is 
+     * @return void
+     */
+    public function paginate($page, $per_page = 10)
+    {
+        $this->offset(( intval($page) - 1 ) * $per_page);
+        $this->limit($per_page);
+        return $this;
+    }
+    /**
+     * Get nb pages
+     */
+    public function nb_pages($per_page = 10)
+    {
+        $nb = $this->get_count();
+        return ceil($nb / $per_page);
+    }
+
+    /**
      * @param string $table
      * @return boolean
      */
