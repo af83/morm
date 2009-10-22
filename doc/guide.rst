@@ -1,6 +1,6 @@
-==============
-Morm - PHP ORM
-==============
+================
+ Morm - PHP ORM
+================
 
 .. contents:: Table of Contents
 
@@ -215,11 +215,23 @@ Polymorphism
 
    CREATE TABLE `comments` (
          `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
-         `user_id` INT NOT NULL,
-         `` VARCHAR( 255 ) NOT NULL
-   ) ENGINE = InnoDB;'
+         `user_id` INT NOT NULL ,
+         `object_id` INT NOT NULL,
+         `object_type` VARCHAR( 255 ) NOT NULL,
+         `body` TEXT NOT NULL
+   ) ENGINE = InnoDB;
 
+.. code-block:: php
+    :linenos:
 
+    <?php
+    class Comments extend Morm
+    {
+       protected $_table = 'comments';
+
+        protected $_foreign_keys = array('object_id' => array('class_from_field' => 'object_type', 'alias' => 'object'));
+    }
+    ?>
 
 Credits
 =======
