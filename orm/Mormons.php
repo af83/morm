@@ -538,7 +538,7 @@ class Mormons implements Iterator
         {
             unset($model);
             $loadable_tables = $this->get_loadable_tables($line);
-            if($this->is_loaded($loadable_tables['bt']))
+            if(isset($loadable_tables['bt']) && $this->is_loaded($loadable_tables['bt']))
             {
                 $model = $this->get_loaded($loadable_tables['bt']);
                 foreach($loadable_tables['fm'] as $table => $pkey)
@@ -626,7 +626,7 @@ class Mormons implements Iterator
     private function extractTablesFromLine($line)
     {
         $tables = array();
-        array_walk($line, create_function('$v, $k, &$tables', '$matches = explode(MormConf::MORM_SEPARATOR, $k); if($matches[0] != $k && !isset($tables[$matches[1]])) $tables[$matches[1]] = true;'), &$tables);
+        array_walk($line, create_function('$v, $k, &$tables', '$matches = explode(MormConf::MORM_SEPARATOR, $k); if($matches[0] != $k && !isset($tables[$matches[1]])) $tables[$matches[1]] = true;'), $tables);
         return array_keys($tables);
     }
 

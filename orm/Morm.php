@@ -1059,7 +1059,7 @@ class Morm
                     }
                 }
                 //TODO manage multiple primary keys
-                $mormons->associateForeignObject($this->getForeignMormonsKey($alias_or_table), &$this);
+                $mormons->associateForeignObject($this->getForeignMormonsKey($alias_or_table), $this);
                 $this->_foreign_mormons[$alias_or_table] = $mormons;
             }
             else
@@ -1140,14 +1140,14 @@ class Morm
                         $mormons->set_order_dir($direction); 
                     }
                 }
-                $mormons->associateForeignObject($this->_pkey, &$this);
+                $mormons->associateForeignObject($this->_pkey, $this);
                 $this->_foreign_mormons[$alias_or_table] = $mormons;
             }
             else
             {
                 if(!isset($this->_foreign_mormons[$alias_or_table]))
                     $this->loadForeignObjectFromMormons($alias_or_table);
-                $this->_foreign_mormons[$alias_or_table]->addMormFromArray($table, $to_load, &$this);
+                $this->_foreign_mormons[$alias_or_table]->addMormFromArray($table, $to_load, $this);
             }
         }
         else
