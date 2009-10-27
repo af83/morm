@@ -12,6 +12,7 @@ class  FieldDesc
     public $values = NULL;
     public $length = NULL;
     public $Key = NULL;
+    public $Null = NULL;
 
     public function Decorate()
     {
@@ -69,6 +70,13 @@ class  FieldDesc
                                'float'
                                );
         return in_array($this->php_type, $numeric_types);
+    }
+
+    public function hasDefaultValue()
+    {
+        if($this->Null == 'YES')
+            return true;
+        return !MormUtils::isEmpty($this->Default);
     }
 
     private function setEnum($match)

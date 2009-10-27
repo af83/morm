@@ -62,4 +62,30 @@ class TestFieldDesc extends MormUnitTestCase
         $this->field->Key = '';
         $this->assertFalse($this->field->isPrimary());
     }
+
+    public function testHasDefaultValueWhenFieldCanHaveNullValue()
+    {
+        $this->field->Type = 'enum(\'foo\',\'bar\')';
+        $this->field->Null = true;
+        $this->field->Decorate();
+        $this->assertTrue($this->field->hasDefaultValue());
+    }
+
+    public function testHasDefaultValueWhenFieldHaveDefaultValue()
+    {
+        $this->field->Type = 'enum(\'foo\',\'bar\')';
+        $this->field->Null = false;
+        $this->field->Default = 'foo';
+        $this->field->Decorate();
+        $this->assertTrue($this->field->hasDefaultValue());
+    }
+
+    public function testHasNoDefaultValueWhenFieldCannotBeNullOrWitDefaultValue()
+    {
+        $this->field->Type = 'enum(\'foo\',\'bar\')';
+        $this->field->Null = false;
+        $this->field->Default = '';
+        $this->field->Decorate();
+        $this->assertFalse($this->field->hasDefaultValue());
+    }
 }

@@ -13,6 +13,7 @@ function morm_autoloader($class)
 {
     $morm_classes = array(MORM_PATH => array('Morm'=> true,
                                              'MormConf'=> true,
+                                             'MormUtils'=> true,
                                              'Mormons'=> true,
                                              'MovableMorm'=> true,
                                              'SqlBuilder'=> true,

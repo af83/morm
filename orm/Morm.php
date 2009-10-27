@@ -1498,7 +1498,7 @@ class Morm
      * @param string $field
      * @return boolean
      */
-    protected function isField ($field)
+    public function isField ($field)
     {
         $td = $this->getTableDesc();
         return $td->isField($field);   
@@ -1517,9 +1517,7 @@ class Morm
     private function hasDefaultValue ($field)
     {
         $field_desc = $this->getFieldDesc($field);
-        if($field_desc->Null == 'YES')
-            return true;
-        return !$this->isEmpty($field_desc->Default);
+        return $field_desc->hasDefaultValue();
     }
 
     /**
@@ -1539,25 +1537,11 @@ class Morm
     }
 
     /**
-     * isEmpty 
-     *
-     * tries to reproduce php's "empty()" function's behaviour in a "not stupid" 
-     * way
-     *
-     * @fixme strlen may be replaced by isset($str[0]) for better performance if 
-     * we are sure it has the same effect
-     * 
-     * @access private
-     * @param mixed 
-     * @return boolean
+     * @todo replace all call by MormUtils::isEmpty
      */
     private function isEmpty($val)
     {
-        if(is_string($val) && strlen($val) == 0)
-            return true;
-        if(is_numeric($val) && intval($val) == 0)
-            return false;
-        return empty($val);
+        return MormUtils::isEmpty($val);
     }
 
     /**
@@ -1626,9 +1610,15 @@ class Morm
         foreach($this->table_desc as $field_name => $field_desc)
         {
             if($field_desc->isPrimary() && $this->hasAutoIncrement() && $this->isEmpty($this->$field_name))
+            {
                 unset($to_insert[$field_name]);
-            if($this->hasDefaultValue($field_name) && $this->isEmpty($this->$field_name) && in_array($field_name, array_keys($to_insert)))
+            }
+            if($this->hasDefaultValue($field_name) && 
+               $this->isEmpty($this->$field_name) && 
+               in_array($field_name, array_keys($to_insert)))
+            {
                 unset($to_insert[$field_name]);
+            }
         }
         return $to_insert;
     }
