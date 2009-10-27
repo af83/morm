@@ -12,7 +12,7 @@ For now, Morm can handle:
 * many to many relations (still in early alpha stage though)
 * polymorphism
 * STI
-
+* FullText search with Sphinx (http://www.sphinxsearch.com/)
 
 thanks to the new Mormulous file, you can now use Morm in a very simple manner.
 
