@@ -109,7 +109,7 @@ class TableDesc implements Iterator
         {
             $ac = false;
             foreach($this->fields as $field_name => $value) {
-                if($field_name != 'table' && $value->Extra == 'auto_increment')
+                if($field_name != 'table' && $value->isAutoIncrement())
                 {
                     $ac = true;
                     $this->table['auto_increment_field'] = $field_name;

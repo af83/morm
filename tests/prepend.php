@@ -15,6 +15,7 @@ function morm_autoloader($class)
                                              'MormConf'=> true,
                                              'MormUtils'=> true,
                                              'Mormons'=> true,
+                                             'MormFactory'=> true,
                                              'MovableMorm'=> true,
                                              'SqlBuilder'=> true,
                                              'SqlTools'=> true,

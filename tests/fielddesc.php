@@ -88,4 +88,10 @@ class TestFieldDesc extends MormUnitTestCase
         $this->field->Decorate();
         $this->assertFalse($this->field->hasDefaultValue());
     }
+
+    public function testAutoIncrement()
+    {
+        $this->field->Extra = 'auto_increment';
+        $this->assertTrue($this->field->isAutoIncrement());
+    }
 }

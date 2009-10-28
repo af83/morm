@@ -25,6 +25,11 @@ class  FieldDesc
         return $this->Key == 'PRI';
     }
 
+    public function isAutoIncrement()
+    {
+        return $this->Extra == 'auto_increment';
+    }
+
     private function setType()
     {
         // see http://fr.php.net/manual/fr/function.mysql-list-fields.php for a 
