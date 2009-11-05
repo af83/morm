@@ -998,7 +998,7 @@ class Morm
             $foreign_class = $this->getForeignClass($field);
             if(is_null($to_load))
             {
-                //TODO use a function until query...
+                //TODO use SqlBuilder
                 $key = $this->isInteger($this->$field) ? $this->$field : "'".$this->$field."'";
                 $sql = "SELECT * FROM `".$this->getForeignTable($field)."` WHERE `".$this->getForeignTableKey($field)."`=".$key;
                 $rs = SqlTools::sqlQuery($sql);
