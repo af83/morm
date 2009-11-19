@@ -7,11 +7,14 @@ class AllTests extends TestSuite {
         $testsFile = array('basics', 'fielddesc', 
                            'tabledesc', 'sqltool', 
                            'oneToMany', 'sti',
-                           'factory');
+                           'factory', 'field');
         foreach ($testsFile as $file)
         {
             $this->addFile(dirname(__FILE__) .'/'. $file . '.php');
         }
     }
 }
+
+
+simpletest_autorun();
 ?>
