@@ -47,7 +47,6 @@ class MormFactory
     {
         $tabledesc = $instance->getTableDesc();
         $fields = $tabledesc->getFields();
-        $autoincrement = $tabledesc->hasAutoIncrement();
         foreach ($fields as $field_name => $field)
         {
             $value = NULL;
