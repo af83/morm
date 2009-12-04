@@ -7,6 +7,7 @@ define('MORM_PATH', BASE_PATH.'orm/');
 define('MORM_CONF_PATH', BASE_PATH.'conf/');
 define('EXCEPTION_PATH', BASE_PATH.'exception/');
 define('MODELS_PATH', BASE_PATH.'tests/models/');
+define('FIELD_PATH', BASE_PATH.'orm/field/');
 define('GENERATED_MODELS_PATH', BASE_PATH.'tests/models/'); //this one should be writable
 
 function morm_autoloader($class)
@@ -28,16 +29,18 @@ function morm_autoloader($class)
                                                   'MormNoForeignObjectToLoadException'=> true,
                                                   'NoPrimaryKeySqlException'=> true,
                                                   'MormDuplicateEntryException' => true,
-                                                 ),
+                                                 ) ,
+                            FIELD_PATH => array('MormFieldSqlFunction' => true)
                          );
     /**
      * is the required class a Morm class ? 
      */
     foreach($morm_classes as $path => $classes)
     {
+        
         if(isset($classes[$class]))
         {
-            require_once($path.$class.'.php');
+            require_once($path.$class.'.php');  
             return true;
         }
     }

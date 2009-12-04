@@ -14,6 +14,7 @@ define('MORM_PATH', BASE_PATH.'orm/');
 define('MORM_CONF_PATH', BASE_PATH.'conf/');
 define('EXCEPTION_PATH', BASE_PATH.'exception/');
 define('MODELS_PATH', BASE_PATH.'models/');
+define('FIELD_PATH', BASE_PATH.'field/');
 define('GENERATED_MODELS_PATH', BASE_PATH.'models/'); //this one should be writable
 
 //set here your database connection informations
@@ -41,6 +42,7 @@ function morm_autoloader($class)
                           EXCEPTION_PATH => array('MormValidateException'=> true,
                                                   'MormNoForeignObjectToLoadException'=> true,
                                                  ),
+                          FIELD_PATH => array('MormFieldSqlFunction' => true)
                          );
     /**
      * is the required class a Morm class ? 

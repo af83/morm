@@ -37,6 +37,10 @@ class SqlTools
                 break;
             case 'array':
             case 'object':
+                if($value instanceof MormFieldSqlFunction) 
+                {
+                    return $value->__tostring();
+                }
                 $values = array();
                 foreach($value as $k => $v)
                     $values[$k] = self::formatSqlValue($v);
