@@ -48,6 +48,11 @@ class MormTestSqlFormatAndEscape extends MormUnitTestCase
         $this->assertEqual("SELECT id WHERE id='FOO\'BAR'", SqlTools::formatQuery('SELECT id WHERE id=?', array("FOO'BAR")));
     }
 
+    public function testFormatMormFieldSqlFunction()
+    {
+        $this->assertEqual("INSERT INTO dtc VALUES(NOW())", SqlTools::formatQuery('INSERT INTO dtc VALUES(?)', array(new MormFieldSqlFunction('NOW()'))));
+    }
+
     public function testFormatEscapeStringWithHtml()
     {
         $this->assertEqual('SELECT id WHERE id=\'<iframe src=\"HACK\">HACK</iframe>\'', SqlTools::formatQuery('SELECT id WHERE id=?', array('<iframe src="HACK">HACK</iframe>')));

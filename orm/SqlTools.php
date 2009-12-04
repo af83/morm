@@ -37,7 +37,8 @@ class SqlTools
                 break;
             case 'array':
             case 'object':
-                if(is_a($value, 'MormFieldSqlFunction')) {
+                if($value instanceof MormFieldSqlFunction) 
+                {
                     return $value->__tostring();
                 }
                 $values = array();
