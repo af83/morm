@@ -65,8 +65,8 @@ class MormFactory
                 {
                     $value = rand();
                 }
+                $instance->$field_name = $value;
             }
-            $instance->$field_name = $value;
         }
     }
 }
