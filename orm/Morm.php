@@ -294,14 +294,14 @@ class Morm
             $join_table = $keys[0];
             $dummy_id = array($this->_has_many[$alias_or_table]['using'][$join_table]['key'] => $this->{$this->_pkey}, 
                               $this->_has_many[$alias_or_table]['key'] => $foreign_key_value);//@fixme this is not the right way to get the foreign key name
-            $class_name = MormConf::generateMormClass($join_table);
+            $class_name = MormConf::getClassName($join_table);
             $dummy = new $class_name($dummy_id);
             $dummy->delete();
         }
         else
         {
             $join_table = $this->getForeignMormonsTable($alias_or_table);
-            $class_name = MormConf::generateMormClass($join_table);
+            $class_name = MormConf::getClassName($join_table);
             $join_table = $this->getForeignMormonsTable($alias_or_table);
             $dummy = new $class_name($foreign_key_value);
             //what should we do here ? Set to zero is certainly not a godd idea
@@ -321,14 +321,14 @@ class Morm
             $join_table = $keys[0];
             $to_set = array($this->_has_many[$alias_or_table]['using'][$join_table]['key'] => $this->{$this->_pkey}, 
                               $this->getForeignKeyFromUsingTable($join_table) => $foreign_key_value);//@fixme this is not the right way to get the foreign key name
-            $class_name = MormConf::generateMormClass($join_table);
+            $class_name = MormConf::getClassName($join_table);
             $dummy = new $class_name();
             $dummy->setFromArray($to_set);
             $dummy->save();
         }
         else
         {
-            $class_name = MormConf::generateMormClass($join_table);
+            $class_name = MormConf::getClassName($join_table);
             $join_table = $this->getForeignMormonsTable($alias_or_table);
             $dummy = new $class_name($foreign_key_value);
             $dummy->{$this->_has_many[$alias_or_table]['key']} = $this->{$this->_pkey};
@@ -721,7 +721,7 @@ class Morm
         {
             if(isset($val['using']) && isset($val['using'][$table_or_alias]))
             {
-                $class_name = MormConf::generateMormClass($this->getForeignMormonsTable($key));
+                $class_name = MormConf::getClassName($this->getForeignMormonsTable($key));
                 continue;
             }
         }
@@ -903,7 +903,7 @@ class Morm
             }
             else
                 $table_name = $this->_foreign_keys[$field]['table'];
-            return MormConf::generateMormClass($table_name);
+            return MormConf::getClassName($table_name);
         }
         else
             throw new Exception($field.' is not a foreign key in table '.$this->_table);
@@ -924,7 +924,7 @@ class Morm
     {
         if(empty($this->_fields[$field]))
             throw new Exception('Could not retrieve Foreign class from field '.$field);
-        return MormConf::generateMormClass($this->_fields[$field]);
+        return MormConf::getClassName($this->_fields[$field]);
     }
 
     /**
@@ -1091,7 +1091,7 @@ class Morm
             $mormons->set_join($using_alias);
             if(!isset($to_set['table']))
             {
-                $dummy_class = MormConf::generateMormClass($using_alias);
+                $dummy_class = MormConf::getClassName($using_alias);
                 $dummy = new $dummy_class();
                 $table = $dummy->_table;
             }
@@ -1832,7 +1832,7 @@ class Morm
         {
             if(isset($to_load[$sti_field]) && !empty($to_load[$sti_field]))
             {
-                $sti_class = MormConf::generateMormClass($to_load[$sti_field]);
+                $sti_class = MormConf::getClassName($to_load[$sti_field], $super_class);
                 $sti_model = new $sti_class();
                 if($sti_model->is_a($super_class)) 
                 {
@@ -1867,7 +1867,7 @@ class Morm
             $sti_field_mormonized = 'morm'.MormConf::MORM_SEPARATOR.$model->_table.MormConf::MORM_SEPARATOR.$sti_field;
             if(isset($to_load[$sti_field_mormonized]) && !empty($to_load[$sti_field_mormonized]))
             {
-                $sti_class = MormConf::generateMormClass($to_load[$sti_field_mormonized], $model->_table);
+                $sti_class = MormConf::getClassName($to_load[$sti_field_mormonized], $model->_table);
                 if (!$sti_class) 
                 {
                     throw new MormSqlException('The class '. $to_load[$sti_field_mormonized] . ' doesn\'t exists.');

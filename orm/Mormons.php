@@ -203,7 +203,7 @@ class Mormons implements Iterator
     public function add_table($table)
     {
         if($this->is_used_table($table)) throw new Exception("The table ".$table." already exists in this object");
-        $class_name = MormConf::generateMormClass($table); 
+        $class_name = MormConf::getClassName($table);
         $base_object = new $class_name();
         $table = $base_object->_table;
         $this->tables[] = $table;

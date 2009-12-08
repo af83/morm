@@ -23,9 +23,16 @@ class MormConf
      *  @todo move sowhere else (probably in SQLTools)
      */
     const MORM_SEPARATOR = '_|_';
-
+    
     /**
-     * generateMormClass
+     * @deprecated : use getClassName instead
+     */
+    public static function generateMormClass($class_name) {
+        return self::getClassName($class_name);
+    }
+    
+    /**
+     * getClassName
      *
      * more like a model autoloader than a generator
      * tries to bind the given class_name on an existing class either by looking 
@@ -37,9 +44,9 @@ class MormConf
      * @access public
      * @return found or generated class name
      */
-    public static function generateMormClass($class_name)
+    public static function getClassName($class_name, $class_parent = 'Morm')
     {
-        $class_name = self::isInConf($class_name) ? self::$_morm_conf[$class_name] : $class_name;
+        $class_name = self::isInConf($class_name, $class_parent) ? self::getFromConf($class_name, $class_parent) : $class_name;
         $table = $class_name;
         if(class_exists($class_name)) {
             if(in_array('Morm', class_parents($class_name)))
@@ -65,11 +72,11 @@ class MormConf
      * 
      * @return array parsed ini file
      */
-    public static function getIniConf()
+    public static function loadIniConf()
     {
         if(!isset(self::$_morm_conf))
         {
-            self::$_morm_conf = parse_ini_file(MORM_CONF_PATH.self::INI_CONF_FILE);
+            self::$_morm_conf = parse_ini_file(MORM_CONF_PATH.self::INI_CONF_FILE, TRUE);
         }
         return self::$_morm_conf;
     }
@@ -82,10 +89,15 @@ class MormConf
      * @param string $class_name 
      * @return boolean
      */
-    public static function isInConf($class_name)
+    public static function isInConf($class_name, $class_parent = 'Morm')
     {
-        self::getIniConf();
-        return isset(self::$_morm_conf[$class_name]);
+        self::loadIniConf();
+        return isset(self::$_morm_conf[$class_parent][$class_name]);
     }
+    
+    
+    public static function getFromConf($class_name, $class_parent = 'Morm') {
+        return self::$_morm_conf[$class_parent][$class_name];
+    } 
 
 }
