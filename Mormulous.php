@@ -38,6 +38,7 @@ function morm_autoloader($class)
                                              'TableDesc'=> true,
                                              'FieldDesc'=> true,
                                              'MormAttachement'=> true,
+                                             'MormGenerator' => true
                                             ),
                           EXCEPTION_PATH => array('MormValidateException'=> true,
                                                   'MormNoForeignObjectToLoadException'=> true,

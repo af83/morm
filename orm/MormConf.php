@@ -17,7 +17,7 @@ class MormConf
      * relativ path to the morm_conf.ini file 
      */
     const INI_CONF_FILE = 'morm_conf.ini';
-
+    
     /**
      *  separator used for the generated SQL aliases
      *  @todo move sowhere else (probably in SQLTools)
@@ -37,74 +37,25 @@ class MormConf
      * @access public
      * @return found or generated class name
      */
-    public static function generateMormClass ($class_name)
+    public static function generateMormClass($class_name)
     {
         $class_name = self::isInConf($class_name) ? self::$_morm_conf[$class_name] : $class_name;
         $table = $class_name;
-        if(class_exists($class_name))
-        {
+        if(class_exists($class_name)) {
             if(in_array('Morm', class_parents($class_name)))
                 return $class_name;
             $class_name = 'm_'.$class_name;
         }
-        self::generateMorm($class_name, $table);
-        $file_name = GENERATED_MODELS_PATH.$class_name.'.php';
-        if (file_exists($file_name)) 
-        {
-            require_once $file_name;
-            if(class_exists($class_name))
-                {
-                    if(in_array('Morm', class_parents($class_name)))
-                        return $class_name;
-                    throw new MormSqlException('class '.$class_name.' is not a Morm');
-                }
+        
+        $generator = new MormGenerator($class_name, $table);
+        $generator->run();
+
+        if($generator->check()) {
             return $class_name;
+        } else {
+            throw new MormSqlException('class '.$class_name.' is not a Morm');
         }
-        return NULL;
-    }
-
-    public static function generateMorm($class_name, $table = NULL)
-    {
-        $file_name = GENERATED_MODELS_PATH.$class_name.'.php';
-        $table = is_null($table) ? self::CamelCaseToLower($class_name) : $table;
-        $class_name = self::LowerToCamel($class_name);
-        if(!file_exists($file_name))
-        {
-            $tmpl_eclass = <<<Q
-<?php
-    class %s extends Morm 
-    {
-        protected \$_table = '%s';
-    }
-?>
-
-Q;
-            file_put_contents($file_name, sprintf($tmpl_eclass, $class_name, $table));
-        } 
-    }
-
-    /**
-     * Converts 'MyPrettyRabbit' into 'my_pretty_rabbit'
-     *
-     * @param   String  $str    String to convert
-     * @return  String
-     */
-    public static function CamelCaseToLower($str = '')
-    {
-        if ( empty($str) ) return $str;
-        return strtolower(implode('_', array_filter(preg_split('/([A-Z][a-z]*)/', $str, -1, PREG_SPLIT_DELIM_CAPTURE))));
-    }
-
-    /**
-     * Convert 'my_pretty_rabbit' into 'MyPrettyRabbit'
-     *
-     * @param   String  $str    String to convert
-     * @return  String
-     */
-    public static function LowerToCamel($str = '')
-    {
-        if ( empty($str) ) return $str;
-        return str_replace(' ', '', ucwords(str_replace('_', ' ', $str)));
+       
     }
 
     /**

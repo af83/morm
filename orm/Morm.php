@@ -1867,7 +1867,7 @@ class Morm
             $sti_field_mormonized = 'morm'.MormConf::MORM_SEPARATOR.$model->_table.MormConf::MORM_SEPARATOR.$sti_field;
             if(isset($to_load[$sti_field_mormonized]) && !empty($to_load[$sti_field_mormonized]))
             {
-                $sti_class = MormConf::generateMormClass($to_load[$sti_field_mormonized]);
+                $sti_class = MormConf::generateMormClass($to_load[$sti_field_mormonized], $model->_table);
                 if (!$sti_class) 
                 {
                     throw new MormSqlException('The class '. $to_load[$sti_field_mormonized] . ' doesn\'t exists.');
