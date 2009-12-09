@@ -998,9 +998,9 @@ class Morm
             $foreign_class = $this->getForeignClass($field);
             if(is_null($to_load))
             {
-                //FIXME remove quotes when not needed
-                //use a getFor or FindBy fonction
-                $sql = "select * from `".$this->getForeignTable($field)."` where `".$this->getForeignTableKey($field)."`='".$this->$field."'";
+                //TODO use SqlBuilder
+                $key = $this->isInteger($this->$field) ? $this->$field : "'".$this->$field."'";
+                $sql = "SELECT * FROM `".$this->getForeignTable($field)."` WHERE `".$this->getForeignTableKey($field)."`=".$key;
                 $rs = SqlTools::sqlQuery($sql);
                 if($rs && mysql_num_rows($rs) != 0)
                 {
