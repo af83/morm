@@ -490,6 +490,11 @@ class Mormons implements Iterator
      */
     public function get_count($with_limit = false)
     {
+        
+        if($this->_executed) {
+            return $this->nb_mormons;
+        }
+        
         $limit_stmt = $with_limit ? SqlBuilder::order_by($this->order, $this->order_dir).SqlBuilder::limit($this->offset, $this->limit) : '';
         $rs = SqlTools::sqlQuery("SELECT count(1)
                         \nFROM ".SqlBuilder::from($this->get_from_tables()).
