@@ -259,9 +259,14 @@ class Morm
             $this->castFields();
             if(!$this->isNew())
             {      
-                if(count($this->fieldsToUpdate()) > 0)
+                if(count($this->fieldsToUpdate()) > 0 )
                 {
-                    return SqlTools::sqlQuery($this->createUpdateSql());
+                    if (SqlTools::sqlQuery($this->createUpdateSql())) {
+                        $this->_original = $this->_fields;
+                        return true;
+                    } else {
+                        return false;
+                    }
                 }
 
                 return true;
@@ -273,6 +278,7 @@ class Morm
                 if($ret && $this->hasAutoIncrement())
                 {
                     $autoincrement_field = $this->table_desc->getAutoIncrementField();
+                    $this->_original = $this->_fields; 
                     $this->_fields[$autoincrement_field] = mysql_insert_id();
                     $this->_original[$autoincrement_field] = $this->_fields[$autoincrement_field];
                 }
