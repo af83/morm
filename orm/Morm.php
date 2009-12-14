@@ -47,6 +47,8 @@ class Morm
      */
     protected $_foreign_object;
 
+    private $_table_desc;
+    
     /**
      * @access protected
      * @var array
@@ -68,7 +70,7 @@ class Morm
     /**
      * @access public
      */
-    var $_columns;
+    public $_columns;
 
     /**
      * @access public
@@ -181,27 +183,33 @@ class Morm
             $this->$name = $value;
     }
 
+
+    /**
+     * @todo : optim : do a statistic analysis to order actions by each use rate.
+     */
     public function __get ($name)
     {
-        if($this->isField($name))
+        if($this->isField($name)) {
             return isset($this->_fields[$name]) ? $this->_fields[$name] : NULL ;
-        if($this->isForeignTable($name))
+        } elseif($this->isForeignTable($name)) {
             return $this->getForeignObject($this->getForeignKeyFromTable($name));
-        if($this->isForeignAlias($name))
+        } elseif($this->isForeignAlias($name)) {
             return $this->getForeignObject($this->getForeignKeyFromAlias($name));
-        if($this->isForeignMormons($name))
+        } elseif($this->isForeignMormons($name)) {
             return $this->getManyForeignObjects($name);
-        /**
-         * if nothing worked before, try to see if the method called get<CamelCased($name)> exists
-         * if it does, call it and return the result
-         */
-        $method_name = 'get'.str_replace(' ', '', ucwords(str_replace('_', ' ', $name)));
-        if(method_exists($this, $method_name))
+        } elseif(method_exists($this, $method_name = 'get'.str_replace(' ', '', ucwords(str_replace('_', ' ', $name))))) {
+            /**
+             * if nothing worked before, try to see if the method called get<CamelCased($name)> exists
+             * if it does, call it and return the result
+             */
             return $this->$method_name();
-        else if (isset($this->$name))
+        } elseif(isset($this->$name)) {
             return $this->$name;
-        return NULL;
+        } else {
+            return NULL;
+        }
     }
+
 
     public function __call ($method, $args)
     {
@@ -272,7 +280,7 @@ class Morm
                 $ret = SqlTools::sqlQuery($sql);
                 if($ret && $this->hasAutoIncrement())
                 {
-                    $autoincrement_field = $this->table_desc->getAutoIncrementField();
+                    $autoincrement_field = $this->getTableDesc()->getAutoIncrementField();
                     $this->_fields[$autoincrement_field] = mysql_insert_id();
                     $this->_original[$autoincrement_field] = $this->_fields[$autoincrement_field];
                 }
@@ -403,7 +411,7 @@ class Morm
         if($rs && mysql_num_rows($rs) > 0) 
         {
             $this->_original = mysql_fetch_assoc($rs);
-            foreach($this->table_desc as $field => $field_desc)
+            foreach($this->getTableDesc() as $field => $field_desc)
             {
                 settype($this->_original[$field], $field_desc->php_type);
             }
@@ -1197,7 +1205,7 @@ class Morm
      */
     public function fillDefaultValues()
     {
-        foreach($this->table_desc as $field_name => $field_desc)
+        foreach($this->getTableDesc() as $field_name => $field_desc)
         {
             if($this->hasDefaultValue($field_name) && $this->isEmpty($this->$field_name))
                 $this->$field_name = $this->getDefaultValue($field_name);
@@ -1211,15 +1219,15 @@ class Morm
      * 
      * @return TableDesc
      */
-    public function getTableDesc ()
-    {
-        return TableDesc::getTable($this->_table); 
-    }
+     public function getTableDesc ()
+     {   
+         if(!isset($this->_table_desc)) {
+             $this->_table_desc = af_orm_TableDesc::getTable($this->_table); 
+         }
+         return $this->_table_desc;
+     }
 
-//    public function getFields ()
-//    {
-//        return $this->table_desc->getFields(); 
-//    }
+
 
     /**
      * getHasManyStatements 
@@ -1246,7 +1254,7 @@ class Morm
     {
         if($this->isField($field))
         {
-            return $this->table_desc->$field;
+            return $this->getTableDesc()->$field;
         }
         else
             throw new Exception($field.' is not a field of the table '.$this->_table);
@@ -1267,7 +1275,7 @@ class Morm
      */
     public function validate()
     {
-        foreach($this->table_desc as $field_name => $field_desc)
+        foreach($this->getTableDesc() as $field_name => $field_desc)
         {
             $error = false;
             $validate_method = 'validate'.ucfirst($field_name);
@@ -1411,7 +1419,7 @@ class Morm
      */
     public function castFields()
     {
-        foreach($this->table_desc as $field_name => $field_desc)
+        foreach($this->getTableDesc() as $field_name => $field_desc)
         {
             if($field_desc->php_type == 'integer' && $this->isEmpty($this->$field_name))
                 $this->_fields[$field_name] = NULL;
@@ -1436,7 +1444,7 @@ class Morm
     {
         if(is_null($this->_pkey))
         {
-            $this->_pkey = $this->table_desc->getPKey();
+            $this->_pkey = $this->getTableDesc()->getPKey();
         }
         return $this->_pkey;
     }
@@ -1500,8 +1508,7 @@ class Morm
      */
     public function isField ($field)
     {
-        $td = $this->getTableDesc();
-        return $td->isField($field);   
+        return $this->getTableDesc()->isField($field);   
     }
 
     /**
@@ -1592,7 +1599,7 @@ class Morm
      */
     private function hasAutoIncrement ()
     {
-        return $this->table_desc->hasAutoIncrement();   
+        return $this->getTableDesc()->hasAutoIncrement();   
     }
 
     /**
@@ -1607,7 +1614,7 @@ class Morm
     private function fieldsToInsert ()
     {
         $to_insert = $this->_fields;
-        foreach($this->table_desc as $field_name => $field_desc)
+        foreach($this->getTableDesc() as $field_name => $field_desc)
         {
             if($field_desc->isPrimary() && $this->hasAutoIncrement() && $this->isEmpty($this->$field_name))
             {
@@ -1651,7 +1658,7 @@ class Morm
     private function fieldsToUpdate ()
     {
         $to_update = array_diff_assoc($this->_fields, $this->_original);
-        foreach($this->table_desc as $field_name => $field_desc)
+        foreach($this->getTableDesc() as $field_name => $field_desc)
         {
             if($field_desc->isPrimary() && $this->hasAutoIncrement() && $this->isEmpty($this->$field_name))
                 unset($to_update[$field_name]);
