@@ -100,7 +100,7 @@ class TestDatabaseManager
 
     protected function connectDB()
     {
-        $this->db = mysql_connect('localhost', 'root', '');    
+        $this->db = mysql_connect('localhost', 'test', 'test');    
         $this->queryDB("SET NAMES 'utf8'");
         $this->cleanDB();
     }
