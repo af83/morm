@@ -46,11 +46,10 @@ class MorphinxSearch
                              'host'=> "localhost",
                              'port'=> 3312,
                              'connect_timeout' => 1,
-
                              'weights' => array ( 100, 1 ),
                              'ranker' => SPH_RANK_PROXIMITY_BM25,
                              'index' => "*",
-                             'mode'=> SPH_MATCH_ALL,
+                             'match_mode'=> SPH_MATCH_ALL,
                             );
         return $sphinx_conf;
     }
@@ -75,9 +74,21 @@ class MorphinxSearch
                 $this->client->SetFilter($attr_name, is_array($filter) ? $filter : array($filter) );
             }
         }
-        
         $this->client->SetMatchMode ( isset($conf['match_mode']) ? $conf['match_mode'] : SPH_MATCH_ALL );
-        $this->client->SetSortMode ( isset($conf['sort_mode']) ? $conf['sort_mode'] : SPH_SORT_RELEVANCE );
+        $mode = isset($conf['sort_mode']) && isset($conf['sort_mode'][0]) ? $conf['sort_mode'][0] : SPH_SORT_RELEVANCE;
+        $groupby = isset($conf['sort_mode']) && isset($conf['sort_mode'][1]) ? $conf['sort_mode'][1] : '';
+        $this->client->SetSortMode($mode, $groupby);
+        if (isset($this->args['filters'])) 
+        {
+            foreach ($this->args['filters'] as $col => $crit)
+            {
+                if (!is_array($crit))
+                {
+                    $crit = array($crit);
+                }
+                $this->client->SetFilter($col, $crit);
+            }
+        }
         //$this->client->SetIndexWeights ( array ( "sfrjt_user_User_index" => 2, "sfrjt_user_Artist_index" => 3 ) );
         //$this->client->SetConnectTimeout ( $conf['connect_timeout'] );
         //$this->client->SetWeights ( $conf['weights'] );

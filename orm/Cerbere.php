@@ -37,7 +37,7 @@ Class Cerbere extends Mormons
 
     public function conditions($conditions)
     {
-        $index = $this->base_models[$this->base_table]->getMorphinxIndex();
+        $index = $this->base_object->getMorphinxIndex();
         foreach($conditions as $field => $condition)
         {
             /**
@@ -46,6 +46,14 @@ Class Cerbere extends Mormons
             if(in_array($field, $index['fields']))
             {
                 $this->setSphinxArg('conditions', array($this->getMorphinxFieldName($field) => $condition));
+            }
+            if(isset($index['manual_attributes']))
+            {
+                foreach($index['manual_attributes'] as $attr)
+                {
+                    if($attr['name'] == $field)
+                        $this->setSphinxArg('conditions', array($field => $condition));
+                }
             }
         }
     }
@@ -72,7 +80,7 @@ Class Cerbere extends Mormons
             {
                 $ids []= $match['attrs'][strtolower($this->base_class).'_id']; 
             }
-            $this->add_conditions(array($this->base_models[$this->base_table]->getPkey() => $ids));
+            $this->add_conditions(array($this->base_object->getPkey() => $ids));
             parent::execute();
         }
         else
@@ -110,7 +118,7 @@ Class Cerbere extends Mormons
 
     public function getMorphinxTableForField($field)
     {
-        $index = $this->base_models[$this->base_table]->getMorphinxIndex();
+        $index = $this->base_object->getMorphinxIndex();
         foreach($index['fields'] as $key => $value)
         {
             if(!is_numeric($key))
@@ -121,7 +129,7 @@ Class Cerbere extends Mormons
                     return $key;
             }
             if($value == $field)
-                return $this->base_table;
+                return $this->base_class;
         }
     }
 

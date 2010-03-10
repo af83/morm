@@ -131,7 +131,7 @@ class TableDesc implements Iterator
      * @param string $field
      * @return boolean
      */
-    public function isField ($field)
+    public function isField($field)
     {
         return isset($this->fields[$field]);
     }

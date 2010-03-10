@@ -8,6 +8,8 @@
  */
 class MormGenerator {
     
+    const GENERATED_MODELS_PATH = NULL;
+    
     private $class_name;
     private $table;
     
@@ -17,6 +19,11 @@ class MormGenerator {
     }
     
     public function run() {
+        
+        if(!$this->isEnabled()) {
+            return FALSE;
+        }
+        
         $file_name = $this->getFileName();
         $table = is_null($this->table) ? self::CamelCaseToLower($this->class_name) : $this->table;
         $this->class_name = self::LowerToCamel($this->class_name);
@@ -35,10 +42,19 @@ Q;
     }
     
     public function getFileName() {
+        
+        if(!$this->isEnabled()) {
+            return NULL;
+        }
+        
         return sprintf('%s/%s.php',
             GENERATED_MODELS_PATH,
             $this->class_name
         );
+    }
+    
+    public function isEnabled() {
+        return !is_null(self::GENERATED_MODELS_PATH);
     }
     
     

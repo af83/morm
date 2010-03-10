@@ -3,7 +3,7 @@
 class MorphinxIndexer
 {
 
-    const CONF_TPL_FILE ='/include/af/orm/sphinx/sphinx.conf.tpl.php'; 
+    const CONF_TPL_FILE = 'sphinx.conf.tpl.php'; 
 
     private $models = array();
 
@@ -54,8 +54,9 @@ class MorphinxIndexer
 
     public function getGlobalConf()
     {
-        $global_conf_file = SITEBASE.'/tools/sphinx/conf.ini';
-        if(!file_exists($global_conf_file)) die("The global conf file should exist. If it does not, you should create it by doing: \ncp ".SITEBASE.'/tools/sphinx/conf_sample.ini '.$global_conf_file."\n and edit the conf.ini file for your needs\n");
+        $global_conf_file = 'conf.ini';
+        if(!file_exists($global_conf_file)) 
+            die("The global conf file should exist. If it does not, you should create it by doing: \ncp ".SITEBASE.'/tools/sphinx/conf_sample.ini '.$global_conf_file."\n and edit the conf.ini file for your needs\n");
         $this->global_conf = parse_ini_file($global_conf_file);
     }
 }

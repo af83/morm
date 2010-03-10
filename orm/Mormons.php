@@ -5,35 +5,31 @@
  * @author Luc-pascal Ceccaldi aka moa3 <luc-pascal@ceccaldi.eu> 
  * @license BSD License (3 Clause) http://www.opensource.org/licenses/bsd-license.php)
  */
-class Mormons implements Iterator
+class Mormons implements Iterator, Countable, ArrayAccess
 {
 
     /**
-     * @access private
+     * @access protected
      */
-    private $mormons = null; 
+    protected $mormons = null; 
 
     /**
-     * @access private
+     * @access protected
      * @var integer
      */
-    private $nb_mormons = null;
+    protected $nb_mormons = null;
 
     /**
-     * @access private
+     * @access protected
      */
-    private $mormon_keys = null; 
+    protected $mormon_keys = null; 
 
     /**
      * @access private
      */
     private $key = 0;
 
-    /**
-     * @access private
-     * @var array
-     */
-    private $tables = array();
+    private $classes = array();
 
     /**
      * @access private
@@ -51,7 +47,9 @@ class Mormons implements Iterator
      * @access private
      * @var array
      */
-    private $join_tables = array();
+    private $join_classes = array();
+
+    private $join_aliases = array();
 
     /**
      * @access private
@@ -64,6 +62,8 @@ class Mormons implements Iterator
      * @var string
      */
     private $sql_where = '';
+
+    private $group_by = null;
 
     /**
      * @access private
@@ -83,26 +83,24 @@ class Mormons implements Iterator
      */
     private $offset = null;
 
-    public $needRightElements = false;
-
     /**
      * @access private
      * @var integer
      */
     private $limit = null;
 
-    /**
-     * @access private
-     * @var array
-     */
-    private $base_models = array();
+    private $per_page = 42;
 
-    /**
-     * @access private
-     */
-    private $base_table = null;
+    private $lazy_load = null;
+    
+    private $class_from_field_value = array();
 
-    private $_executed = false;
+    protected $base_class = null;
+    protected $base_object = null;
+
+    protected $_executed = false;
+    private $_total_elements = null;
+    protected $executed_filters = array();
 
     private $_foreign_object_waiting_for_association = null;
 
@@ -110,19 +108,20 @@ class Mormons implements Iterator
      * __construct 
      *
      * Constructor for the Mormons.
-     * The given parameter must be a table name and will be used as the base 
+     * The given parameter must be a table name or model class and will be used as the base 
      * table name
+     *
+     * giving a table as init parameter is now deprecated and will soon not be supported anymore
      * 
      * @param string $init 
      * @return void
      */
     public function __construct ($init)
     {
-        if(is_string($init)) //this is suppose to be a table name
-        {
-            $init = $this->add_table($init);
-            $this->base_table = $this->base_models[$init]->_table;
-        }
+        $init = class_exists($init) && is_subclass_of($init, 'Morm') ? $init : MormConf::getClassName($init);
+        $this->addClass($init);
+        $this->base_class = $init;
+        $this->base_object = MormDummy::get($this->base_class);
     }
 
     /**
@@ -142,8 +141,16 @@ class Mormons implements Iterator
      */
     public function __call ($method, $arguments)
     {
-        if(method_exists($this, $method))
-            return call_user_func_array(array($this, $method), $arguments);
+        $clone = false;
+        if(preg_match('/^(.+)Clone$/', $method, $matches))
+        {
+            $method = $matches[1];
+            $clone = true;
+        }
+        if(method_exists($this->base_object, 'filter_'.$method))
+        {
+            return $clone ? $this->getFilteredByClone($method, $arguments) : $this->getFilteredBy($method, $arguments);
+        }
         if(is_array($this->mormons))
         {
             foreach($this->mormons as $obj_id => $morm)
@@ -162,8 +169,14 @@ class Mormons implements Iterator
     {
         if(is_numeric($get))
             return $this->getById($get);
-        if($filter = $this->base_models[$this->base_table]->isFilter($get))
-            return $this->getFilteredBy($filter);
+        $clone = false;
+        if(preg_match('/^(.+)Clone$/', $get, $matches))
+        {
+            $get = $matches[1];
+            $clone = true;
+        }
+        if($this->base_object->isFilter($get))
+            return $clone ? $this->getFilteredByClone($get) : $this->getFilteredBy($get);
         return NULL;
     }
 
@@ -171,45 +184,188 @@ class Mormons implements Iterator
     {
         if(!$this->_executed)
             $this->execute();
-        $to_get = array($this->base_table => $id);
-        if($this->is_loaded($to_get))
+        if($this->isLoaded($this->base_class, $id))
         {
-            return $this->mormons[$this->base_table.'_'.$id];
+            return $this->mormons[$this->base_class.'_'.$id];
         }
         else
-            throw new Exception("The object identified by $id in table {$this->base_table} is not in this mormons");
+            throw new Exception("The object identified by $id for class {$this->base_class} is not in this mormons");
     }
 
-    public function getFilteredBy($filter)
+    public function getFilteredByClone($filter_name, Array $opts = array())
     {
-        $this->setFilter($filter);
+        $clone = $this->getClone();
+        return $clone->getFilteredBy($filter_name, $opts);
+    }
+
+    public function getFilteredBy($filter_name, Array $opts = array())
+    {
+        if(!$this->isFilteredBy($filter_name, $opts))
+            $this->setFilter($filter_name, $opts);
         return $this;
     }
 
-    protected function setFilter($filter)
-    {
-        foreach($filter as $type => $to_set)
-            call_user_func_array(array($this, $type), $to_set);
+    public function isFilteredBy($filter_name, Array $opts = array())
+    {    
+        if(empty($opts))
+            return isset($this->executed_filters[$filter_name]);
+        return isset($this->executed_filters[$filter_name.'()']) && $this->executed_filters[$filter_name.'()'] == $opts;//FIXME how does the array comparison works ?
     }
 
-    /**
-     * add_table 
-     * 
-     * 
-     *
-     * @param string $table 
-     * @return string
-     */
-    public function add_table($table)
+    protected function setFilter($filter_name, Array $opts = array())
     {
-        if($this->is_used_table($table)) throw new Exception("The table ".$table." already exists in this object");
-        $class_name = MormConf::getClassName($table);
-        $base_object = new $class_name();
-        $table = $base_object->_table;
-        $this->tables[] = $table;
-        $this->where[$table] = array();
-        $this->base_models[$table] = $base_object;
-        return $table;
+        if(empty($opts))
+        {
+            $this->executed_filters[$filter_name] = true; 
+            $filters = $this->base_object->getFilter($filter_name);
+        }
+        else
+        {
+            $this->executed_filters[$filter_name.'()'] = $opts;
+            $filters = call_user_func_array(array($this->base_object, 'filter_'.$filter_name), $opts);
+        }
+        
+        foreach($filters as $type => $to_set)
+            call_user_func_array(array($this, $type), $to_set);
+        
+    }
+
+    public function manageHasManyStatmt($has_many_stmt, $base_obj, $stmt, $add_joining_condition = true)
+    {
+        //TODO manage multiple primary keys
+        foreach($stmt as $f => $param)
+        {
+            $func = 'hasMany' . ucfirst($f) . 'Statmt';
+            if(method_exists($this, $func)) 
+            {
+                call_user_func_array(array($this, $func), array($has_many_stmt, $base_obj, $param));
+            }
+        }
+        if($add_joining_condition)
+            $this->addHasManyJoiningCondition($has_many_stmt, $base_obj, $stmt);
+    }
+
+    public function addHasManyJoiningCondition($has_many_stmt, $base_obj, $stmt)
+    {
+        if(isset($stmt['using']))
+        {
+            /**
+             * TODO manage when passing through many tables 
+             * in fact I should just setJoin for each of these values but I first need to:
+             *  - check if the using_class can be directly joined with the base_class in which case I need to add_conditions
+             *  - specify with which class my $using_class should be joined 
+             *  (for this, I could just suppose that the using statement is given in the right order so that the each given class can be directly joined with the one before)
+             */
+            foreach($stmt['using'] as $using_class => $opts)
+            {
+                if(is_integer($using_class)) //nothing else than the joining class
+                {
+                    $using_class = $opts;
+                    $opts = array();
+                } 
+                $dummy = MormDummy::get($using_class);
+                $sources_info = isset($stmt['source']) ? $stmt : $dummy->findSourceFor($base_obj);//this may throw an Exception if no source could be found
+                $ft_key = $dummy->getForeignKeyFor($sources_info['source']);
+                $this->add_conditions(array($ft_key => $base_obj->{$base_obj->getPKey()}), $using_class);
+            }
+        }
+        else
+        {
+            if(isset($stmt['source']))
+            {
+                $source = $stmt['source'];
+            }
+            else
+            {
+                $j = new MormJoin($this->base_class, get_class($base_obj), array('referer' => $has_many_stmt));
+                $source = $j->getSource();
+            }
+            $ft_key = $this->base_object->getForeignKeyFor($source);
+
+            $this->add_conditions(array($ft_key => $base_obj->getPkeyVal()));
+        }
+    }
+
+
+    /**
+     * hasManyUsingStatmt 
+     *
+     * sets the join statement and other things for a has_many mormons using the "using" hash in 
+     * the $alias_or_table has_many hash
+     *
+     * @access private
+     * @param string $alias_or_table 
+     * @param Mormons $mormons (reference)
+     * @return void
+     */
+    private function hasManyUsingStatmt($has_many_stmt, $base_obj, $stmt)
+    {
+        //The commented lines may do th multiple joins job
+        //$previous_class = null;
+        //foreach($stmt['using'] as $using_class => $using_opts)
+        //{
+        //    if(is_integer($using_class)) //nothing else than the joining class
+        //    {
+        //        $using_class = $using_opts;
+        //        $using_opts = array();
+        //    } 
+        //    $first_class = is_null($previous_class) ? $this->base_class : $previous_class;
+        //    $using_opts['referer'] = $referer;
+        //    $this->setJoin($first_class, $using_class, $using_opts);
+        //    $previous_class = $using_class;
+        //}
+        /**
+         * TODO manage when passing through many tables 
+         * in fact I should just setJoin for each of these values but I first need to:
+         *  - check if the using_class can be directly joined with the base_class in which case I need to add_conditions
+         *  - specify with which class my $using_class should be joined 
+         *  (for this, I could just suppose that the using statement is given in the right order so that the each given class can be directly joined with the one before)
+         */
+        foreach($stmt as $using_class => $opts)
+        {
+            if(is_integer($using_class)) //nothing else than the joining class
+            {
+                $using_class = $opts;
+                $opts = array();
+            } 
+            //$opts['referer'] = $has_many_stmt;
+            $opts['origin_obj'] = $base_obj;
+            $this->joins($using_class, $opts);
+        }
+    }
+
+    private function hasManyConditionStatmt($has_many_stmt, $base_obj, $stmt)
+    {
+        $stmts = $base_obj->getHasManyStatements();
+        $this->add_conditions($stmt, $stmts[$has_many_stmt]['class']);
+    }
+
+    private function hasManySql_whereStatmt($has_many_stmt, $base_obj, $stmt)
+    {
+        $this->set_sql_where($stmt);
+    }
+
+    private function hasManyOrderStatmt($has_many_stmt, $base_obj, $stmt)
+    {
+        foreach($stmt as $field => $direction)
+        {
+            $this->set_order($field); 
+            $this->set_order_dir($direction); 
+        }
+    }
+
+    private function addClass($class)
+    {
+        if($this->isUsedClass($class)) throw new Exception("The class ".$class." already exists in this object");
+        $dummy = MormDummy::get($class);
+        $this->classes[$class] = true;
+        $this->where[$class] = array();
+    }
+
+    public function set_sql_whereClone($sql)
+    {
+        $clone = $this->getClone();
+        return $clone->set_sql_where($order, $alternate_table);
     }
 
     /**
@@ -218,12 +374,18 @@ class Mormons implements Iterator
      */
     public function set_sql_where($sql)
     {
-        if(!is_string($sql)) throw new Exception("The where clause is suppose to be a string");
+        if(!is_string($sql)) throw new Exception("The where clause is supposed to be a string");
         if($this->sql_where != $sql)
         {
             $this->sql_where .= ' '.$sql;
-            $this->_executed = false;
+            $this->resetFlags();
         }
+        return $this;
+    }
+
+    public function whereClone($sql)
+    {
+        return $this->set_sql_whereClone($sql);
     }
 
     public function where($sql)
@@ -231,84 +393,145 @@ class Mormons implements Iterator
         return $this->set_sql_where($sql);
     }
 
-    /**
-     * set_join 
-     * 
-     * TODO take $type in account to define if join is RIGHT, LEFT, INNER, OUTER etc.
-     *
-     * @param mixed $table 
-     * @param mixed $on 
-     * @param string $type 
-     * @return void
-     */
-    public function set_join($table_or_alias, $on = null, $type='LEFT')
-    {   
-        $table = $this->getJoinableTable($table_or_alias);
-        if(!$this->is_used_table($table))
+    public function joins($class, Array $opts = array())
+    {
+        if($this->base_object->joinsIndirecltyWith($class))//means that there is no possible direct relation between base_class and class in either way
         {
-            $table = (MormConf::isInConf($table_or_alias)) ? $this->add_table($table_or_alias) : $this->add_table($table);
-            $this->join_tables[] = $table;
-        }
-        if(!is_null($on))
-        {
-            $tables = array_keys($on);
-            $this->joins[] = array(array($tables[0] => $tables[1]), $on);
+            $this->joinsIndirectly($class, $opts);
         }
         else
         {
-            $key = $this->base_models[$this->base_table]->getForeignKeyFrom($table_or_alias);
-            try
-            {
-                $ft_key = $this->base_models[$this->base_table]->getForeignTableKey($key);
-            }
-            catch (Exception $e)
-            {
-                if($this->base_models[$this->base_table]->isForeignUsingTable ($table))
-                    $ft_key = $this->base_models[$this->base_table]->getForeignMormonsUsingKey($table);
-                else
-                    $ft_key = $this->base_models[$this->base_table]->getForeignMormonsKey($table);
-            }
-            $this->joins[] = array(array($this->base_table => $table), array($this->base_table => $key, $table => $ft_key));
+            $this->setJoin($this->base_class, $class, $opts);
         }
-        //@todo put executed tu false only when join has changed
-        $this->_executed = false;
-        //        switch($type)
-        //        {
-        //            case 'LEFT':
-        //                break;
-        //            case 'RIGHT':
-        //                break;
-        //            default:
-        //                throw new Exception("The join type ".$type." does not exist or is not yet supported by Mormons");
-        //                break;
-        //        }
     }
 
+    /**
+     * joinsIndirectly 
+     *
+     * FIXME
+     * this is almost redundant with hasManyUsingStatmt except for the direct joining class.
+     * Here the direct join should be a real join
+     * in hasManyUsingStatmt, it's just another condition
+     * 
+     * @param mixed $class 
+     * @param Array $opts 
+     * @return void
+     */
+    private function joinsIndirectly($class, Array $opts = array())
+    {
+        $stmts = $this->base_object->getHasManyStatementsFor($class, $opts);//these should only be statements containing a "using" key
+        //FIXME strange workaround, need to check this
+        if(isset($stmts['class'])) $stmts = array($stmts);
+//        if(count($stmts) > 1) throw new Exception(sprintf("Join could refer to \"%s\" you should specify the one you need", implode(' or ', $stmts)));
+        foreach($stmts as $referer => $stmt)
+        {
+            $previous_class = null;
+            foreach($stmt['using'] as $using_class => $using_opts)
+            {
+                if(is_integer($using_class)) //nothing else than the joining class
+                {
+                    $using_class = $using_opts;
+                    $using_opts = array();
+                } 
+                $first_class = is_null($previous_class) ? $this->base_class : $previous_class;
+                $using_opts['referer'] = $referer;
+                $this->setJoin($first_class, $using_class, $using_opts);
+                $previous_class = $using_class;
+            }
+            $this->setJoin($previous_class, $stmt['class'], $stmt);
+        }
+    }
+
+    private function setJoin($first_class, $second_class, Array $opts = array())
+    {
+        if(!empty($this->class_from_field_value))
+            $opts['class_from_field_value'] = $this->class_from_field_value;
+        $join = new MormJoin($first_class, $second_class, $opts); 
+
+        if($this->isJoinedWith($join)) return;
+       
+        if(!$this->isUsedClass($second_class))
+        {
+            $this->addClass($second_class);
+            $this->join_classes[$second_class] = true;
+        }
+
+        $this->join_aliases[$join->getSecondTableAlias()] = $join->getSecondObj()->getTable();
+
+        $this->joins []= $join; 
+        $this->resetFlags();
+
+        if(isset($opts['referer']) && $stmt = MormDummy::get($first_class)->getHasManyStatementsFor($second_class, $opts))
+        {
+            $revised_stmt = array_diff_key($stmt, array('class' => true, 'source' => true));
+            $this->manageHasManyStatmt($opts['referer'], MormDummy::get($first_class), $revised_stmt, false);    
+        }
+    }
+
+    private function isJoinedWith(MormJoin $join)
+    {
+        foreach($this->joins as $j)
+        {
+            if($j->isTheSameAs($join))
+                return true;
+        }
+        return false;
+    }
+
+    public function set_orderClone($order, $alternate_table=null)
+    {
+        $clone = $this->getClone();
+        return $clone->set_order($order, $alternate_table);
+    }
     /**
      * set_order 
      * 
      * @todo Consider the possibility of having more than one order fields
      *
      * @param string $order ordering field
-     * @param string $alternate_table optionnal alternate table
+     * @param string $alternate_class optionnal alternate table
      * @return void
      */
-    public function set_order($order, $alternate_table=null)
+    public function set_order($order, $alternate_class = null)
     {
         if(!is_string($order) && !is_array($order)) throw new Exception("The order is suppose to be a field or an array of fields");
-        $order_table = (!is_null($alternate_table)) ? $alternate_table : $this->base_table; 
-        $order_table = (!$this->is_used_table($order_table)) ? $this->add_table($alternate_table) : $order_table; 
+        $class = $this->base_class; 
+        if(!is_null($alternate_class))
+        {
+            $possible_class = MormConf::getClassName($alternate_class);
+            if(!$this->isUsedClass($possible_class)) 
+                $this->addClass($possible_class); 
+            $class = $possible_class;
+        }
         if(is_string($order)) 
             $order = array($order);
-        if(!isset($this->order[$order_table]) || $this->order[$order_table] != $order)
+        if(!isset($this->order[$class]) || $this->order[$class] != $order)
         {
-            $this->order[$order_table] = $order;
-            $this->_executed = false;
+            $this->order[$class] = $order;
+            $this->resetFlags();
         }
         return $this;
     }
-    
-    
+
+    public function group($group, $alternate_class = null)
+    {
+        if(!is_string($group) && !is_array($group)) throw new Exception("The order is suppose to be a field or an array of fields");
+        $class = $this->base_class; 
+        if(!is_null($alternate_class))
+        {
+            $possible_class = MormConf::getClassName($alternate_class);
+            if(!$this->isUsedClass($possible_class)) 
+                $this->addClass($possible_class); 
+            $class = $possible_class;
+        }
+        if(!isset($this->group_by))
+        {
+            $this->group_by = array($class => $group);
+            $this->resetFlags();
+        }
+        return $this;
+    }
+
     public function unset_order()
     {
         $this->order = array();
@@ -319,15 +542,33 @@ class Mormons implements Iterator
      * @param string $dir
      * @return void
      */
+    public function set_order_dirClone($dir)
+    {
+        $clone = $this->getClone();
+        return $clone->set_order_dir($dir);
+    }
+
     public function set_order_dir($dir)
     {
-        if(!in_array($dir, array('DESC', 'desc', 'ASC', 'asc'))) throw new Exception("The direction is suppose to be DESC, desc, ASC or asc");
+        $dir = strtoupper($dir);
+        if(!in_array($dir, array('DESC', 'ASC'))) throw new Exception("The direction is suppose to be DESC or ASC (case insensitive)");
         if($this->order_dir != $dir)
         {
             $this->order_dir = $dir;
-            $this->_executed = false;
+            $this->resetFlags();
         }
         return $this;
+    }
+
+    /**
+     * offset 
+     *
+     * alias for set_offset
+     * 
+     */
+    public function offset($offset)
+    {
+        return $this->set_offset($offset);
     }
 
     /**
@@ -335,13 +576,19 @@ class Mormons implements Iterator
      * @param integer $offset
      * @return void
      */
+    public function set_offsetClone($offset)
+    {
+        $clone = $this->getClone();
+        return $clone->set_offset($dir);
+    }
+
     public function set_offset($offset)
     {
-        if(!is_numeric($offset)) throw new Exception("The offset is suppose to be numeric value");
+        if(!is_numeric($offset)) throw new Exception("The offset is suppose to be a numeric value");
         if($this->offset != $offset)
         {
             $this->offset = $offset;
-            $this->_executed = false;
+            $this->resetFlags();
         }
         return $this;
     }
@@ -359,6 +606,12 @@ class Mormons implements Iterator
         return $this->set_limit($limit);
     }
 
+    public function set_limitClone($limit)
+    {
+        $clone = $this->getClone();
+        return $clone->set_limit($limit);
+    }
+
     /**
      * @throws Exception if $limit is not a numeric value
      * @param integer $limit
@@ -366,13 +619,25 @@ class Mormons implements Iterator
      */
     public function set_limit($limit)
     {
-        if(!is_numeric($limit)) throw new Exception("The limit is suppose to be numeric value");
+        if(!is_numeric($limit)) throw new Exception("The limit is suppose to be a numeric value");
         if($this->limit != $limit)
         {
             $this->limit = $limit;
-            $this->_executed = false;
+            $this->resetFlags();
         }
         return $this;
+    }
+
+    private function resetFlags() {
+        $this->_executed = FALSE;
+        $this->_total_elements = NULL;
+    }
+
+
+    public function paginateClone($page, $per_page = 42)
+    {
+        $clone = $this->getClone();
+        return $clone->paginate($page, $per_page);
     }
 
     /**
@@ -385,58 +650,96 @@ class Mormons implements Iterator
      * @param integer $per_page will set the limit as is 
      * @return void
      */
-    public function paginate($page, $per_page = 10)
+    public function paginate($page, $per_page = 42)
     {
         $this->offset(( intval($page) - 1 ) * $per_page);
         $this->limit($per_page);
+        $this->per_page = $per_page;
         return $this;
-    }
-    /**
-     * Get nb pages
-     */
-    public function nb_pages($per_page = 10)
-    {
-        $nb = $this->get_count();
-        return ceil($nb / $per_page);
     }
 
     /**
-     * @param string $table
-     * @return boolean
+     * Get nb pages
      */
-    public function is_used_table($table)
+    public function nb_pages($per_page = null)
     {
-        return in_array($table, $this->tables);
+        $per_page = is_null($per_page) ? $this->per_page : $per_page;
+        return ceil($this->get_count() / $per_page);
+    }
+
+    public function isUsedClass($class)
+    {
+        return isset($this->classes[$class]);
+    }
+
+    public function conditionsClone($conds, $alternate_table=null)
+    {
+        return $this->add_conditionsClone($conds, $alternate_table);
+    }
+
+    public function add_conditionsClone($conds, $alternate_table=null)
+    {
+        $clone = $this->getClone();
+        return $clone->add_conditions($conds, $alternate_table);
+    }
+    
+    public function conditions($conds, $alternate_table=null)
+    {
+        return $this->add_conditions($conds, $alternate_table);
     }
 
     /**
      * @param array $conds
      * @return void
      */
-    public function add_conditions($conds, $alternate_table=null)
+    public function add_conditions($conds, $alternate_class=null)
     {
-        $cond_table = $this->base_table; 
-        if(!is_null($alternate_table))
+        $class = $this->base_class; 
+        if(!is_null($alternate_class))
         {
-            if(!$this->is_used_table($alternate_table)) 
-                $cond_table = $this->add_table($alternate_table); 
-            else
-                $cond_table = $alternate_table;
+            $possible_class = MormConf::getClassName($alternate_class);
+            if(!$this->isUsedClass($possible_class)) 
+                $this->addClass($possible_class); 
+            $class = $possible_class;
         }
-        
+
+        /**
+         * FIXME is this really usefull ? Shouldn't I just let mysql explode if the request fails ? 
+         */
         foreach ($conds as $field => $void) {
-            if(!$this->base_models[$cond_table]->table_desc->isField($field)) {
-                throw new MormFieldUnexistingException($cond_table, $field);
+            if(!MormDummy::get($class)->table_desc->isField($field)) {
+                throw new exception_MormFieldUnexisting($class, $field);
             }
         }
 
         $this->lookForClassFromFieldToSet($conds);
-        $diffs = array_diff_assoc($conds, $this->where[$cond_table]);
-        if(!empty($diffs))
+        $diffs = array_diff_assoc($conds, $this->where[$class]);
+        if(!empty($diffs))//FIXME WTF is this diff here for ?
         {
-            $this->where[$cond_table] = array_merge($this->where[$cond_table], $conds);
-            $this->_executed = false;
+            $this->where[$class] = array_merge($this->where[$class], $conds);
+            $this->resetFlags();
         }
+        return $this;
+    }
+
+    public function getClone()
+    {
+        return clone $this;
+    }
+
+    public function forceLazyLoading()
+    {
+        $this->lazy_load = true;
+    }
+
+    public function lazyLoad()
+    {
+        if(is_null($this->lazy_load))
+        {
+            $max = (int) is_null($this->limit) ? $this->get_count() : $this->limit;
+            $this->lazy_load = $max > $this->base_object->lazy_loading_limit;
+        }
+        return $this->lazy_load;
     }
 
     /**
@@ -445,17 +748,22 @@ class Mormons implements Iterator
      */
     public function execute()
     {
-        $rs = SqlTools::sqlQuery("SELECT ".SqlBuilder::select($this->tables).
+        if($this->lazyLoad())
+            $select = SqlBuilder::singleSelect($this->base_class, $this->base_object->getPkey());
+        else
+            $select = SqlBuilder::select_with_aliases($this->getSelectTables());
+        $rs = SqlTools::sqlQuery("SELECT ".$select.
                         " \nFROM ".SqlBuilder::from($this->get_from_tables()).
-                        SqlBuilder::joins($this->joins, $this->getJoinType())."\n".
+                        SqlBuilder::joins($this->joins)."\n".
                         SqlBuilder::where($this->where, $this->sql_where)."\n".
+                        SqlBuilder::group_by($this->group_by)."\n".
                         SqlBuilder::order_by($this->order, $this->order_dir)."\n".
                         SqlBuilder::limit($this->offset, $this->limit));
         if($rs)
         {
             $this->load($rs);
             $this->_executed = true;
-            if(!is_null($this->_foreign_object_waiting_for_association))
+            if (!$this->lazyLoad() && !is_null($this->_foreign_object_waiting_for_association))
             {
                 $this->associateForeignObject($this->_foreign_object_waiting_for_association[0], $this->_foreign_object_waiting_for_association[1]);
             }
@@ -467,15 +775,15 @@ class Mormons implements Iterator
 
     public function delete()
     {
-        
         if(!empty($this->order) || !is_null($this->limit) || !is_null($this->offset)) {
-            throw new MormImpossibleDeletionException($this->base_table);
+            throw new exception_MormImpossibleDeletion($this->base_class);
         }
         
-        $rs = SqlTools::sqlQuery("DELETE {$this->base_table} \n".
+        $rs = SqlTools::sqlQuery("DELETE {$this->base_class} \n".
             " FROM ".SqlBuilder::from($this->get_from_tables())."\n".
-            SqlBuilder::joins($this->joins, $this->getJoinType())."\n".
-            SqlBuilder::where($this->where, $this->sql_where)."\n"
+            SqlBuilder::joins($this->joins)."\n".
+            SqlBuilder::where($this->where, $this->sql_where)."\n".
+            SqlBuilder::group_by($this->group_by)."\n"
         );
     
         if(!$rs)
@@ -484,46 +792,49 @@ class Mormons implements Iterator
     }
 
     /**
-     * @todo cache the result
-     * @param boolean $with_limit
      * @return integer
      */
-    public function get_count($with_limit = false)
+    public function get_count()
     {
-        $limit_stmt = $with_limit ? SqlBuilder::order_by($this->order, $this->order_dir).SqlBuilder::limit($this->offset, $this->limit) : '';
-        $rs = SqlTools::sqlQuery("SELECT count(1)
-                        \nFROM ".SqlBuilder::from($this->get_from_tables()).
-                        SqlBuilder::joins($this->joins, $this->getJoinType()).
-                        SqlBuilder::where($this->where, $this->sql_where).
-                        $limit_stmt);
-        if($rs)
-            return (int) mysql_result($rs, 0);
-        else
-            throw new Exception("Fatal error:".mysql_error());
+                
+        if(is_null($this->_total_elements)) {
+  
+            $select = isset($this->group_by) ? sprintf("count(distinct(%s.%s))", key($this->group_by), $this->group_by[key($this->group_by)]) : 'count(1)'; 
+            $rs = SqlTools::sqlQuery("SELECT $select
+                            \nFROM ".SqlBuilder::from($this->get_from_tables()).
+                            SqlBuilder::joins($this->joins).
+                            SqlBuilder::where($this->where, $this->sql_where)."\n"
+            );
+            if($rs)
+                $this->_total_elements = (int) mysql_result($rs, 0);
+            else
+                throw new Exception("Fatal error:".mysql_error());
+            
+        }
+        
+        return $this->_total_elements;
+
+    }
+
+    public function count()
+    {
+        return $this->get_count();
     }
 
     /**
      * @return array
      */
-    public function get_from_tables()
+    private function get_from_tables()
     {
-        return array_diff($this->tables, $this->join_tables);
+        $tables = array();
+        foreach(array_diff(array_keys($this->classes), array_keys($this->join_classes)) as $class)
+            $tables[$class] = MormDummy::get($class)->getTable();
+        return $tables;
     }
 
-    private function getEveryLoadableData($line)
+    private function getSelectTables()
     {
-        $return = array();
-        foreach($line as $field => $value)
-        {
-            //extract table name and field_name
-            $extract = explode(MormConf::MORM_SEPARATOR, $field);
-            $table_name = $extract[1];
-            $field_name = $extract[2];
-            $return['table'][$table_name] = true;
-            $return['loadable_data'][$table_name][$field_name] = $value;
-            $return['object_identifier'][$table_name] = $this->extractMormonIdFromLine($line, $table_name);
-        }
-        return $return;
+        return array_merge($this->get_from_tables(), $this->join_aliases);
     }
 
     /**
@@ -533,141 +844,125 @@ class Mormons implements Iterator
     private function load($rs)
     {
         $this->mormons = array();
-        $model_name = get_class($this->base_models[$this->base_table]);
         while($line = mysql_fetch_assoc($rs))
         {
-            unset($model);
-            $loadable_tables = $this->get_loadable_tables($line);
-            if(isset($loadable_tables['bt']) && $this->is_loaded($loadable_tables['bt']))
+            if($this->lazyLoad() && !$this->isBaseModelLoaded($line))
             {
-                $model = $this->get_loaded($loadable_tables['bt']);
-                foreach($loadable_tables['fm'] as $table => $pkey)
-                    $model->loadForeignObjectFromMormons($table, $line);
+                $this->mormons[$this->base_class.'_'.$this->extractMormonIdFromLine($line, $this->base_class)] = ':lazy_load';
+                continue;
             }
-            else
+            //check if base model is loaded and load it if not
+            $base_model = $this->getLoadedBaseModel($line);
+            foreach($this->joins as $join)
             {
-                $model = Morm::FactoryFromMormons($model_name, $this, $line);
-                $model_fields = $model->getTableDesc();
-                if($model_fields->getPKey())
+                /**
+                 * FIXME
+                 * the first condition is a workaround to avoid having problems with n->m relationships. 
+                 * I must find a way to load everybody according to the joins. 
+                 */
+                if($join->needToload() && $this->base_class == $join->getFirstClass() && !$join->secondIsABelongsToFor($this->base_class))
                 {
-                    $key = is_array($model->_pkey) ? implode(MormConf::MORM_SEPARATOR, $model->getPkeyVal()) : $model->{$model->_pkey};
-                    $this->mormons[$this->base_table.'_'.$key] = $model;
+                    $should_load = extractMatchingKeys(implode('\\'.MormConf::MORM_SEPARATOR, array(MormConf::MORM_PREFIX, $join->getSecondTableAlias(), '(\w+)')), $line);
+                    if(!empty($should_load))
+                    {
+                        $base_model->loadForeignObjectFromMormons($join, $should_load);
+                    }
                 }
-                else
-                    $this->mormons[] = $model;
             }
+            unset($base_model);
         }
         $this->mormon_keys = array_keys($this->mormons);
         $this->nb_mormons = count($this->mormons);
+    }
+
+    private function loadBaseModelForLine($line)
+    {
+        $model = Morm::FactoryFromMormons($this->base_class, $this, $line, $this->joins);
+        $model_fields = $model->getTableDesc();
+        if($model_fields->getPKey())
+        {
+            $key = $model->getPkeyVal(true);
+            $this->mormons[$this->base_class.'_'.$key] = $model;
+        }
+        else //TODO check if this case (the table has no primary key) effectively works
+            $this->mormons[] = $model;
+        return $model;
+    }
+
+    private function isBaseModelLoaded($line)
+    {
+        $mormon_id = $this->extractMormonIdFromLine($line, $this->base_class);
+        return isset($this->mormons[$this->base_class.'_'.$mormon_id]) ? $this->mormons[$this->base_class.'_'.$mormon_id] : false;
+    }
+
+    private function getLoadedBaseModel($line)
+    {
+        $base_model = $this->isBaseModelLoaded($line);
+        if(false === $base_model)
+        {
+            $base_model = $this->loadBaseModelForLine($line);
+        }
+        return $base_model;
     }
 
     /**
      * @param array $object_array
      * @return boolean
      */
-    private function is_loaded($object_array)
+    private function isLoaded($class, $id)
     {
-        $table = array_keys($object_array);
-        $table = $table[0];
-        return isset($this->mormons[$table.'_'.$object_array[$table]]);
+        return isset($this->mormons[$class.'_'.$id]);
     }
 
-    /**
-     * @todo Should maybe check if object is_loaded
-     * @param array $object_array
-     */
-    private function get_loaded($object_array)
+    private function extractMormonIdFromLine($line, $class)
     {
-        $table = array_keys($object_array);
-        $table = $table[0];
-        return $this->mormons[$table.'_'.$object_array[$table]];
-    }
-
-    private function get_loadable_tables(&$line)
-    {
-        $ret = array();
-        foreach($this->extractTablesFromLine($line) as $table)
-        {
-            if($this->base_models[$this->base_table]->isForeignTable($table))
-            {
-                if(!isset($ret['ft'])) $ret['ft'] = array();
-                if(isset($ret['ft'][$table])) continue;
-                $ret['ft'][$table] = $this->extractMormonIdFromLine($line, $table);
-            }
-            else if($this->base_models[$this->base_table]->isForeignMormons($table))
-            {
-                if(!isset($ret['fm'])) $ret['fm'] = array();
-                if(isset($ret['fm'][$table])) continue;
-                $ret['fm'][$table] = $this->extractMormonIdFromLine($line, $table);
-            }
-            else if($table == $this->base_table && !isset($ret['bt']))
-            {
-                $ret['bt'][$table] = $this->extractMormonIdFromLine($line, $table);
-            }
-        }   
-        return $ret;
-    }
-
-    private function extractMormonIdFromLine($line, $table)
-    {
-        if(is_array($this->base_models[$table]->_pkey))
+        $key = MormDummy::get($class)->getPkey();
+        if(is_array($key))
         {
             $to_implode = array();
-            $pkey = $this->base_models[$table]->_pkey;
-            foreach($pkey as $field_name)
-                $to_implode[] = $line['morm'.MormConf::MORM_SEPARATOR.$table.MormConf::MORM_SEPARATOR.$field_name];
-            $ret = implode(MormConf::MORM_SEPARATOR, $to_implode);
+            foreach($key as $field_name)
+            {
+                $to_implode[] = $line[MormConf::MORM_PREFIX.MormConf::MORM_SEPARATOR.$class.MormConf::MORM_SEPARATOR.$field_name];
+            }
+            return implode(MormConf::MORM_SEPARATOR, $to_implode);
         }
-        else
-            $ret ='morm'.MormConf::MORM_SEPARATOR.$table.MormConf::MORM_SEPARATOR.$this->base_models[$table]->_pkey;
-        return $ret;
+        $ret = MormConf::MORM_PREFIX.MormConf::MORM_SEPARATOR.$class.MormConf::MORM_SEPARATOR.$key;
+        return $line[$ret];
     }
 
-    private function extractTablesFromLine($line)
-    {
-        $tables = array();
-        array_walk($line, create_function('$v, $k, &$tables', '$matches = explode(MormConf::MORM_SEPARATOR, $k); if($matches[0] != $k && !isset($tables[$matches[1]])) $tables[$matches[1]] = true;'), $tables);
-        return array_keys($tables);
-    }
-
-    public function addMormFromArray($table, $to_load, &$to_associate = null)
-    {
-        $model_name = get_class($this->base_models[$this->base_table]);
-        $model = Morm::FactoryFromMormons($model_name, $this, $to_load);
-        $model_fields = $model->getTableDesc();
-        if($model_fields->getPKey())
-            $this->mormons[$this->base_table.'_'.$model->{$model->_pkey}] = $model;
+    public function addMormFromArray($join, $to_load, &$to_associate = null)
+    {   
+        $model = Morm::FactoryFromMormons($this->base_class, $this, $to_load, $this->joins);
+        if($model->getTableDesc()->getPKey())
+            $this->mormons[$this->base_class.'_'.$model->getPkeyVal(true)] = $model;
         else
             $this->mormons[] = $model;
         if(is_object($to_associate))
-            $model->loadForeignObject($to_associate->_pkey, $to_associate);
+            $model->loadForeignObject($join->getSource(), $to_associate);
         $this->mormon_keys = array_keys($this->mormons);
         $this->nb_mormons = count($this->mormons);
+        $this->_executed = true;
     }
 
-    public function associateForeignObject($field, &$to_load)
+    public function associateForeignObject($referer, &$to_load)
     {
         if(!$this->_executed)
-            $this->_foreign_object_waiting_for_association = array($field, $to_load);
+            $this->_foreign_object_waiting_for_association = array($referer, $to_load);
         else
+        {
             foreach($this->mormons as $obj_id => $morm)
             {
-                if(is_array($field))
+                if($to_load->isForeignUsing($referer))//FIXME repair this when 'using' is set
                 {
-                    foreach($field as $using => $key)
-                    {
-                        if(!$morm->isForeignUsingTable($using))
-                            $morm->$using->loadForeignObject($key, $to_load);
-                    }
+                    
                 }
                 else
-                    $morm->loadForeignObject($field, $to_load);
+                {
+                    $j = new MormJoin($morm, $to_load, array('referer' => $referer));
+                    $morm->loadForeignObject($j->getSource(), $to_load);
+                }
             }
-    }
-
-    public function getClassFromObjId ($obj_id)
-    {
-        return $obj_id;   
+        }
     }
 
     /**
@@ -677,36 +972,51 @@ class Mormons implements Iterator
         return !empty($this->mormons);
     }
 
-    private function getJoinType()
-    {
-        return $this->needRightElements ? 'INNER' : 'LEFT';
-    }
-
-    private function getJoinableTable($table_or_alias)
-    {
-        if($this->base_models[$this->base_table]->isForeignAlias($table_or_alias))
-            return $this->base_models[$this->base_table]->getForeignTableFromAlias($table_or_alias);
-        else
-            return $table_or_alias;
-    }
-
     private function lookForClassFromFieldToSet($conditions)
     {
         foreach($conditions as $cond_field => $condition)
         {
-            if($this->base_models[$this->base_table]->isForeignClassFromField($cond_field) && !is_array($condition))
+            if($this->base_object->isForeignClassFromField($cond_field) && !is_array($condition))
             {
-                $field_value = $this->base_models[$this->base_table]->$cond_field;
+                $field_value = isset($this->class_from_field_value[$cond_field]) ? $this->class_from_field_value[$cond_field] : NULL;
                 if(empty($field_value))
-                    $this->base_models[$this->base_table]->$cond_field = $condition;
-                else
+                    $this->class_from_field_value[$cond_field] = $condition;
+                else if ($field_value != $condition)
                     throw new Exception('Impossible to redefine a condition on a \'class_form_field\' field');
             }
         }
     }
+
+    private function getMorm($mormon_key)
+    {
+        if(is_object($this->mormons[$mormon_key]))
+            return $this->mormons[$mormon_key]; 
+        return call_user_func_array(array($this->base_class, 'FactoryFromId'), array($this->base_class, $this->extractPKeyFromMormonKey($mormon_key)));
+    }
+
+    private function extractPKeyFromMormonKey($mormon_key)
+    {
+        $key = $this->base_object->getPkey();
+        if(is_array($key))
+        {
+            $to_find = array();
+            foreach($key as $field_name)
+                $to_find[] = '(?P<'.$field_name.'>[^\\'.MormConf::MORM_SEPARATOR.']+)';
+            $regexp = '/'.$this->base_class.'_'.implode(MormConf::MORM_SEPARATOR, $to_find).'/';
+            $matches = array();
+            preg_match($regexp, $mormon_key, $matches);
+            return $matches;//TODO remove the values having a numerical key first
+        }
+        $regexp = '/'.$this->base_class.'_'.'(?P<'.$key.'>[^\\'.MormConf::MORM_SEPARATOR.']+)'.'/';
+        $matches = array();
+        preg_match($regexp, $mormon_key, $matches);
+        return $matches[$key];
+    }
     
     public function first()
     {
+        if(!$this->_executed)
+            $this->limit(1);
         $this->rewind();
         return $this->current();
     }
@@ -714,16 +1024,19 @@ class Mormons implements Iterator
     public function last()
     {
         $this->rewind();
-        return $this->mormons[$this->mormon_keys[$this->nb_mormons - 1]]; 
+        if($this->nb_mormons == 0) {
+            return NULL;
+        } else {
+            return $this->mormons[$this->mormon_keys[$this->nb_mormons - 1]]; 
+        }
     }
 
     /************ Iterator methods **************/
-    public function current()
-    { 
+    public function current(){ 
         if (isset($this->mormon_keys[$this->key]) && 
             isset($this->mormons[$this->mormon_keys[$this->key]]))
         {
-            return $this->mormons[$this->mormon_keys[$this->key]]; 
+            return $this->getMorm($this->mormon_keys[$this->key]); 
         }
         return NULL;
     }
@@ -750,5 +1063,50 @@ class Mormons implements Iterator
             $this->execute();
         return $this->key < $this->nb_mormons;
     }
+
+    /*********** ArrayAccess methods **************/
+    // Méthode d'ajout d'une valeur dans le tableau
+    public function offsetSet($offset, $value) {
+        throw new Exception('Forbidden');
+    }
+    
+    // Supprime une valeur du tableau
+    public function offsetUnset($offset) {
+        throw new Exception('Forbidden');
+    }
+
+    // Retourne une valeur contenue dans le tableau
+    public function offsetGet($offset) {
+        return $this->mormons[$this->mormon_keys[$offset]];
+    }
+
+    // Test si une valeur existe dans le tableau
+    public function offsetExists($offset){
+        return isset($this->mormons[$this->mormon_keys[$offset]]);
+    }
+
+
+
+    /**
+     * DATA PROVIDERS 
+     */
+
+    public function toObj($linked_objs = array())
+    {
+        if(!$this->_executed)
+            $this->execute();
+        $obj = new Data();
+        foreach($this->mormons as $obj_id => $morm)
+        {
+            $obj->$obj_id = $morm->toObj($linked_objs);
+        }
+        return $obj;
+    }
+
+    public function toJSON($opts=array())
+    {
+        return json_encode($this->toObj($opts));
+    }
+
 }
 

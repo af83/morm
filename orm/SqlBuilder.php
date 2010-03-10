@@ -19,19 +19,28 @@ class SqlBuilder
                 $table = $val;
                 $val = '*';
             }
-            $table_desc = TableDesc::getTable($table); 
-            switch(gettype($val)) 
+            if(class_exists($table))
+                $table_desc = TableDesc::getTable(MormDummy::get($table)->getTable()); 
+            else
+                $table_desc = TableDesc::getTable($table); 
+            if(is_array($val))
             {
-            case 'array':
+                $alias = $table;
+                if(isset($val['morm_table_alias']))
+                {
+                    $alias = $val['morm_table_alias'];
+                    unset($val['morm_table_alias']);
+                }
                 foreach($val as $field)
                 {
                     if($table_desc->isField($field))
-                        $statement[] = self::singleSelect($table, $field);
+                        $statement[] = self::singleSelect($alias, $field);
                     else
                         $statement[] = $field;
                 }
-                break;
-            case 'string':
+            }
+            else
+            {
                 if(empty($val) || $val == '*')
                 {
                     foreach($table_desc as $field => $field_desc)
@@ -40,53 +49,82 @@ class SqlBuilder
                     }
                 }
                 else
-                    $statement[] = $field;
-                break;
-            default:
-                break;
+                    $statement[] = self::singleSelect($table, $val);
             }
         }
         return implode(',', $statement);
     }
 
-    static function singleSelect($table, $field, $prefix = 'morm')
+    static function select_with_aliases($select)
+    {
+        $statement = array();
+        foreach($select as $alias => $table)
+        {
+            if(is_numeric($alias))
+                $alias = $table;
+
+            $table_desc = TableDesc::getTable($table); 
+            foreach($table_desc as $field => $field_desc)
+            {
+                $statement[] = self::singleSelect($alias, $field);
+            }
+        }
+        return implode(',', $statement);
+    }
+
+    static function singleSelect($table, $field, $prefix = MormConf::MORM_PREFIX)
     {
         return '`'.$table.'`.`'.$field.'` as '.self::selectAlias($table, $field, $prefix);
     }
 
-    static function selectAlias($table, $field, $prefix = 'morm')
+    static function selectAlias($table, $field, $prefix = MormConf::MORM_PREFIX)
     {
-        $prefix = is_string($prefix) ? $prefix : 'morm';
+        $prefix = is_string($prefix) ? $prefix : MormConf::MORM_PREFIX;
         return '`'.$prefix.MormConf::MORM_SEPARATOR.$table.MormConf::MORM_SEPARATOR.$field.'`';
     }
 
     static function from($tables)
     {
         $tables = !is_array($tables) ? array($tables) : $tables ;
-        return ' `'.implode('`,`', $tables).'` ';
+        $from = array();
+        foreach($tables as $alias => $table)
+        {
+            if(is_numeric($alias))
+            $from []= sprintf("`%s` ", $table);
+            else
+            $from []= sprintf("`%s` AS `%s`", $table, $alias);
+        }
+        return ' '.implode(',', $from).' ';
     }
 
-    static function joins($joins, $type)
+    static function joins($joins)
     {
         $ret = array();
         foreach($joins as $join)
-            $ret[] = self::singleJoin($join[0], $join[1], $type);
+        {
+            $ret[] = self::singleJoin($join);
+        }
         return implode(' ', $ret);
     }
 
-    static function singleJoin($tables, $fields, $type)
+    static function singleJoin($join)
     {
-        $left = array_keys($tables);
-        $left = $left[0];
-        $right = $tables[$left];
-        return ' '.$type.' JOIN `'.$right.'` ON `'.$left.'`.`'.$fields[$left].'`=`'.$right.'`.`'.$fields[$right].'` ';
+        return sprintf(" %s JOIN `%s` AS `%s` ON `%s`.`%s`=`%s`.`%s` ", 
+                       $join->getDirection(),
+                       $join->getSecondObj()->getTable(),
+                       $join->getSecondTableAlias(),
+                       $join->getFirstTableAlias(),
+                       $join->getFirstKey(),
+                       $join->getSecondTableAlias(),
+                       $join->getSecondKey());
     }
 
     static function where($conditions, $sql_where='')
     {
-        
-        if(empty($conditions))
+        if(empty($conditions) && empty($sql_where))
             return '';
+        if(empty($conditions))
+            $conditions = array();
         $where = array();
         foreach($conditions as $table => $condition)
         {
@@ -113,17 +151,25 @@ class SqlBuilder
             $operator = $condition[$field]['operator'];
             $condition[$field] = $condition[$field][0];
         }
-        $table_desc = TableDesc::getTable($table);
+        //$table_desc = TableDesc::getTable($table);
         if(is_array($condition[$field]))
         {
-            foreach($condition[$field] as $key => $value)
-                settype($condition[$field][$key], $table_desc->$field->php_type);
+        //    foreach($condition[$field] as $key => $value)
+        //        settype($condition[$field][$key], $table_desc->$field->php_type);
             $operator = 'IN';
             return '`'.$table.'`.`'.$field.'` '.$operator.' ('.SqlTools::formatSqlValue($condition[$field]).')';
 
         }
-        settype($condition[$field], $table_desc->$field->php_type);
+        //settype($condition[$field], $table_desc->$field->php_type);
         return '`'.$table.'`.`'.$field.'` '.$operator.' '.SqlTools::formatSqlValue($condition[$field]);
+    }
+
+    static function group_by($group_by)
+    {
+        if(is_null($group_by))
+            return '';
+        $alias = key($group_by);
+        return sprintf(" GROUP BY `%s`.`%s` ", $alias, $group_by[$alias]);
     }
 
     static function order_by($orders, $dir)
@@ -135,6 +181,11 @@ class SqlBuilder
         {
             if(is_array($order))
             {
+                if(isset($order['sql']))
+                {
+                    $order_by[] = $order['sql'];
+                    unset($order['sql']);
+                }
                 foreach($order as $k => $ord)
                     $order_by[] = self::singleOrder_By($table, $ord);
             }

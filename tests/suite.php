@@ -17,4 +17,3 @@ class AllTests extends TestSuite {
 
 
 simpletest_autorun();
-?>

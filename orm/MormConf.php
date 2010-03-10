@@ -22,7 +22,8 @@ class MormConf
      *  separator used for the generated SQL aliases
      *  @todo move sowhere else (probably in SQLTools)
      */
-    const MORM_SEPARATOR = '_|_';
+    const MORM_SEPARATOR = '|';
+    const MORM_PREFIX    = '';
     
     /**
      * @deprecated : use getClassName instead
@@ -86,18 +87,26 @@ class MormConf
      *
      * looks for the given class name in the morm_conf.ini file
      * 
-     * @param string $class_name 
+     * @param string $alias_name 
+     * @param string $class_parent
      * @return boolean
      */
-    public static function isInConf($class_name, $class_parent = 'Morm')
+    public static function isInConf($alias_name, $class_parent = 'Morm')
     {
         self::loadIniConf();
-        return isset(self::$_morm_conf[$class_parent][$class_name]);
+        return isset(self::$_morm_conf[$class_parent][$alias_name]);
     }
     
     
-    public static function getFromConf($class_name, $class_parent = 'Morm') {
-        return self::$_morm_conf[$class_parent][$class_name];
+    public static function getFromConf($alias_name, $class_parent = 'Morm') {
+        self::loadIniConf();
+        return self::$_morm_conf[$class_parent][$alias_name];
     } 
+
+    public static function getAliasForClass($class_name, $class_parent = 'Morm') {
+        self::loadIniConf();
+    	$alias_for_class = array_flip(self::$_morm_conf[$class_parent]);
+    	return $alias_for_class[$class_name];
+    }
 
 }

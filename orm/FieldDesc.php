@@ -39,6 +39,7 @@ class  FieldDesc
                          'int' => '/^int\(([\d]+)\)([^\$]*)$/',
                          'varchar' => '/^varchar\(([\d]+)\)$/',
                          'tinyint' => '/^tinyint\(([\d]+)\)([^\$]*)$/',
+                         'bigint' => '/^bigint\(([\d]+)\)([^\$]*)$/',
                          'enum' => '/^enum\(([^\)]*)\)$/',
                          'set' => '/^set\(([^\)]*)\)$/',
                          );
@@ -62,6 +63,7 @@ class  FieldDesc
                                'bool' => 'boolean',
                                'int' => 'integer',
                                'tinyint' => 'integer',
+                               'bigint' => 'integer',
                                'float' => 'float',
                                );
         if(isset($type_corresps[$this->type]))
@@ -95,6 +97,11 @@ class  FieldDesc
     }
 
     private function setInt($match)
+    {
+        $this->length = intval($match[1]);
+    }
+
+    private function setBigint($match)
     {
         $this->length = intval($match[1]);
     }

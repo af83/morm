@@ -158,7 +158,7 @@ searchd
 	#
 	# address				= 127.0.0.1
 	# address				= 192.168.0.1
-    address             = <?php echo isset($this->global_conf['address']) ? $this->global_conf['address'] : '0.0.0.0' ?>
+    listen              = <?php echo isset($this->global_conf['address']) ? $this->global_conf['address'] : '0.0.0.0' ?>
 
 	# searchd TCP port number
 	# mandatory, default is 3312

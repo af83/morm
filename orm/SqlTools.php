@@ -35,12 +35,12 @@ class SqlTools
             case 'string':
                 return "'".self::mysql_escape($value, TRUE)."'";
                 break;
-            case 'array':
             case 'object':
-                if($value instanceof MormFieldSqlFunction) 
-                {
-                    return $value->__tostring();
+                if($value instanceof MormFieldSqlFunction) {
+                    return strval($value);
+                    break;
                 }
+            case 'array':
                 $values = array();
                 foreach($value as $k => $v)
                     $values[$k] = self::formatSqlValue($v);

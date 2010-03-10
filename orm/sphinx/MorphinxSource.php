@@ -21,7 +21,7 @@ class MorphinxSource
     public function __construct($model_name)
     {
         $this->name = $model_name;
-        $this->model = new $model_name();
+        $this->model = MormDummy::get($model_name);
         $this->setSqlConf();
         $this->setSqlPreQueries();
         $this->setFetchQuery();
@@ -38,12 +38,12 @@ class MorphinxSource
     private function setSqlConf()
     {
         //FIXME find a better way to get the conf, this one is sooooo bad
-        $config = new Config(SITEBASE .'/conf/conf.ini', $_SERVER["HTTP_HOST"]);
+        $config = array();
 
-        $this->sql_host = $config->dbserver;
-        $this->sql_user = $config->dbuser;
-        $this->sql_pass = $config->dbpass;
-        $this->sql_db = $config->dbname; 
+        $this->sql_host = $config['dbserver'];
+        $this->sql_user = $config['dbuser'];
+        $this->sql_pass = $config['dbpass'];
+        $this->sql_db = $config['dbname']; 
         $this->sql_port = 3306; //TODO get from conf
     }
 
@@ -55,14 +55,14 @@ class MorphinxSource
 
     private function setFetchQuery()
     {
-        $this->fetch_query = "SELECT `".$this->model->_table."`.`".$this->model->getPkey()."` * %d + %d as id, ".
+        $this->fetch_query = str_replace("\n", ' ', "SELECT `".$this->name."`.`".$this->model->getPkey()."` * %d + %d as id, ".
                         "'".$this->name."' as `class_".$this->name."`, ".
-                        '`'.$this->model->_table."`.`".$this->model->getPkey()."` as `".$this->name."_id`, ".
-                        af_orm_SqlBuilder::select($this->getSelectedFields()).
-                        " FROM ".af_orm_SqlBuilder::from($this->model->_table).
-                        af_orm_SqlBuilder::joins($this->buildJoins(), 'LEFT')." ".
+                        '`'.$this->name."`.`".$this->model->getPkey()."` as `".$this->name."_id`, ".
+                        SqlBuilder::select($this->getSelectedFields()).
+                        " FROM ".SqlBuilder::from(array($this->name => $this->model->_table)).
+                        SqlBuilder::joins($this->buildJoins())." ".
                         $this->getSqlJoins()." ".
-                        af_orm_SqlBuilder::where($this->getConditions(), $this->getSqlConditions());
+                        SqlBuilder::where($this->getConditions(), $this->getSqlConditions()));
     }
 
     private function setQueryRange()
@@ -80,16 +80,20 @@ class MorphinxSource
 
         $this->attributes []= array('name' => $this->name.'_id', 
                                     'type' => 'sql_attr_uint');
-        if(isset($index['attributes']))
+        if (isset($index['attributes']))
         {
             foreach($index['attributes'] as $attr_name)
             {
                 $table = $this->getAttributeTable($attr_name);
                 $this->attributes []= array(
-                                      'name' => str_replace('`', '', af_orm_SqlBuilder::selectAlias($table, $attr_name)),
+                                      'name' => str_replace('`', '', SqlBuilder::selectAlias($table, $attr_name)),
                                       'type' => $this->getAttributeType($attr_name)
                                       );
             }
+        }
+        if (isset($index['manual_attributes'])) 
+        {
+            $this->attributes = array_merge($this->attributes, $index['manual_attributes']);
         }
     }
 
@@ -119,7 +123,7 @@ class MorphinxSource
                     return $key;
             }
             if($value == $attr_name)
-                return $this->model->_table;
+                return $this->name;
         }
         throw new Exception('The attribute "'.$attr_name.'" should be in the selected fields');
     }
@@ -141,9 +145,9 @@ class MorphinxSource
             }
             else
             {
-                if(isset($ret[$this->model->_table]) && !is_array($ret[$this->model->_table]))
-                    $ret[$this->model->_table] = array();
-                $ret[$this->model->_table] []= $value;
+                if(isset($ret[$this->name]) && !is_array($ret[$this->name]))
+                    $ret[$this->name] = array();
+                $ret[$this->name] []= $value;
             }
         }
         return $ret;
@@ -156,7 +160,9 @@ class MorphinxSource
         foreach($index['fields'] as $key => $value)
         {
             if(is_string($key))
-                $ret []= $this->model->getJoinFor($key);
+            {
+                $ret []= new MormJoin(get_class($this->model), $key);
+            }
         }
         return $ret;
     }
@@ -180,8 +186,8 @@ class MorphinxSource
     private function getSqlConditions()
     {
         $index = $this->model->getMorphinxIndex();
-        $sql_conditions = array("`".$this->model->_table."`.`".$this->model->getPkey().'` >= $start', 
-                                "`".$this->model->_table."`.`".$this->model->getPkey().'` <= $end');
+        $sql_conditions = array("`".$this->name."`.`".$this->model->getPkey().'` >= $start', 
+                                "`".$this->name."`.`".$this->model->getPkey().'` <= $end');
         if(isset($index['sql_conditions']))
             $sql_conditions = array_merge($sql_conditions, $index['sql_conditions']);
         return implode(' AND ', $sql_conditions);

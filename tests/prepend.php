@@ -22,8 +22,8 @@ function morm_autoloader($class)
                                              'SqlTools'=> true,
                                              'TableDesc'=> true,
                                              'FieldDesc'=> true,
-                                             'MormAttachement'=> true,
-                                             'MormGenerator' => true
+                                             'MormGenerator' => true,
+                                             'MormDummy' => true
                                             ),
                           EXCEPTION_PATH => array('MormSqlException'=> true,
                                                   'MormValidateException'=> true,
@@ -100,7 +100,7 @@ class TestDatabaseManager
 
     protected function connectDB()
     {
-        $this->db = mysql_connect('localhost', 'test', 'test');    
+        $this->db = mysql_connect('localhost', 'root', '');    
         $this->queryDB("SET NAMES 'utf8'");
         $this->cleanDB();
     }
