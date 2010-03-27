@@ -110,3 +110,29 @@ class MormConf
     }
 
 }
+
+//FIXME put what comes next in MormHelpers or something like that
+/**
+ * extractMatchingKeys 
+ * 
+ * return a part of the given array in wich every key matches the given regexp
+ *
+ * @param mixed $regexp 
+ * @param Array $array 
+ * @access public
+ * @return Array
+ */
+function extractMatchingKeys($regexp, Array $array)
+{
+    $ret = array();
+    foreach($array as $key => $value)
+    {
+        $matches = array();
+        if(preg_match(sprintf("/%s/", $regexp), $key, $matches))
+        {
+            $new_key = isset($matches[1]) ? $matches[1] : $matches[0];
+            $ret[$new_key] = $value;
+        }
+    }
+    return $ret;
+}
