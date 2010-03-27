@@ -27,7 +27,6 @@ class MormGenerator {
     {
         protected \$_table = '%s';
     }
-?>
 
 Q;
             file_put_contents($file_name, sprintf($tmpl_eclass, $this->class_name, $this->table));
