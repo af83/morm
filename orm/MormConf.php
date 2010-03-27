@@ -76,7 +76,8 @@ class MormConf
     {
         if(!isset(self::$_morm_conf))
         {
-            self::$_morm_conf = parse_ini_file(MORM_CONF_PATH.self::INI_CONF_FILE, TRUE);
+            $file = MORM_CONF_PATH.self::INI_CONF_FILE;
+            self::$_morm_conf = file_exists($file) ? parse_ini_file($file, TRUE) : array();
         }
         return self::$_morm_conf;
     }
