@@ -373,17 +373,25 @@ class Morm
                 $previous_class = $using_class;
                 if(count($to_set) == 2)
                 {
-                    $dummy = new $previous_class();
-                    $dummy->setFromArray($to_set);
-                    $dummy->save();
-                    $to_set = array();
+                    $existing_one = new Mormons($previous_class);
+                    if($existing_one->conditions($to_set)->count() == 0)
+                    {
+                        $dummy = new $previous_class();
+                        $dummy->setFromArray($to_set);
+                        $dummy->save();
+                        $to_set = array();
+                    }
                 }
             }
             $join = new MormJoin($previous_class, $this->_has_many[$has_many]['class'], $this->_has_many[$has_many]);
-            $to_set[$join->getSecondKey()] = $foreign_key_value; 
-            $dummy = new $previous_class();
-            $dummy->setFromArray($to_set);
-            $dummy->save();
+            $to_set[$join->getFirstKey()] = $foreign_key_value; 
+            $existing_one = new Mormons($previous_class);
+            if($existing_one->conditions($to_set)->count() == 0)
+            {
+                $dummy = new $previous_class();
+                $dummy->setFromArray($to_set);
+                $dummy->save();
+            }
         }
         else
         {
