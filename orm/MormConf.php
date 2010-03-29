@@ -75,9 +75,10 @@ class MormConf
      */
     public static function loadIniConf()
     {
-        if(!isset(self::$_morm_conf))
+        $filename = MORM_CONF_PATH.self::INI_CONF_FILE;
+        if(!isset(self::$_morm_conf) && file_exists($filename))
         {
-            self::$_morm_conf = parse_ini_file(MORM_CONF_PATH.self::INI_CONF_FILE, TRUE);
+            self::$_morm_conf = parse_ini_file($file, TRUE);
         }
         return self::$_morm_conf;
     }
