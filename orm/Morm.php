@@ -1407,7 +1407,8 @@ class Morm
 //            $this->fillDefaultValues();
         if(count( $this->_errors) != 0)
         {
-            throw new exception_MormValidate($this->_errors);
+            $this->_errors['errors_on'] = get_class($this);
+            throw new MormValidateException($this->_errors);
         }
 
         return count($this->_errors) == 0;
