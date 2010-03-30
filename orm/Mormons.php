@@ -122,6 +122,7 @@ class Mormons implements Iterator, Countable, ArrayAccess
         $this->addClass($init);
         $this->base_class = $init;
         $this->base_object = MormDummy::get($this->base_class);
+        $this->manageStiConds();
     }
 
     /**
@@ -286,6 +287,11 @@ class Mormons implements Iterator, Countable, ArrayAccess
         }
     }
 
+    protected function manageStiConds()
+    {
+        if($sti_field = $this->base_object->getStiField()) // there is an sti, we should now add a condition
+            $this->conditions(array($sti_field => $this->base_object->getStiValue()));
+    }
 
     /**
      * hasManyUsingStatmt 

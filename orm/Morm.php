@@ -114,6 +114,7 @@ class Morm
      * @var string
      */
     protected $sti_field = 'type';
+    protected $sti_value = null;
 
     /**
      * _plugin
@@ -174,6 +175,7 @@ class Morm
             else if(!is_null($this->_pkey) && !$this->isEmpty($to_load))
                 $this->loadByPKey($to_load);
         }
+        $this->manageStiField();
     }
 
     /**
@@ -335,8 +337,14 @@ class Morm
                 }
             }
             $join = new MormJoin($previous_class, $this->_has_many[$has_many]['class'], $this->_has_many[$has_many]);
-            $dummy_id[$join->getSecondKey()] = $foreign_key_value; 
-            $dummy = new $previous_class($dummy_id);
+            $dummy_id[$join->getFirstKey()] = $foreign_key_value; 
+            if(is_array(MormDummy::get($previous_class)->getPkey()))
+                $dummy = new $previous_class($dummy_id);
+            else
+            {
+                $d = new Mormons($previous_class);
+                $dummy = $d->conditions($dummy_id)->first();
+            }
             $dummy->delete();
         }
         else
@@ -1920,6 +1928,23 @@ class Morm
         throw new Exception($this->sti_field.' is not a field of the table '.$this->_table.' and can therefore not be used as an sti field');
     }
 
+    public function getStiValue()
+    {
+        return is_null($this->sti_value) ? MormGenerator::CamelCaseToLower(get_class($this)) : $this->sti_value;
+    }
+
+    public function manageStiField()
+    {
+        if($sti_field = $this->getStiField()) // there is an sti, we should do something
+        {
+            $sti_val = $this->$sti_field;
+            if(empty($sti_val))
+            {
+                $this->$sti_field = $this->getStiValue();
+            }
+        }
+    }
+
     /**
      * is_a 
      * 
@@ -1953,8 +1978,7 @@ class Morm
     public static function Factory($super_class, $to_load)
     {
         $class = $super_class;
-        $model = new $class();
-        if($sti_field = $model->getStiField())
+        if($sti_field = MormDummy::get($class)->getStiField())
         {
             if(isset($to_load[$sti_field]) && !empty($to_load[$sti_field]))
             {
@@ -1970,7 +1994,6 @@ class Morm
             else
                 throw new Exception('(in Factory) ' . $super_class . ' : Could not guess the class to instantiate from this array, the sti field wasn\'t there');
         }
-        unset($model);
         return new $class($to_load);
     }
 
