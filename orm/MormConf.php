@@ -49,11 +49,12 @@ class MormConf
     {
         $class_name = self::isInConf($class_name, $class_parent) ? self::getFromConf($class_name, $class_parent) : $class_name;
         $table = $class_name;
-        if(class_exists($class_name)) {
+        if(class_exists($class_name) || class_exists($class_name = MormGenerator::LowerToCamel($class_name))) {
             if(in_array('Morm', class_parents($class_name)))
                 return $class_name;
             $class_name = 'm_'.$class_name;
         }
+        if(class_exists())
         
         $generator = new MormGenerator($class_name, $table);
         $generator->run();

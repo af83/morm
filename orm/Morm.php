@@ -360,6 +360,7 @@ class Morm
 
     public function joinWithMorm($has_many, $foreign_key_value)
     {
+        $dummy = null;
         //@todo create specific exception
         if(!$this->isForeignMormons($has_many))
             throw new Exception(get_class($this)." does not have many ".$has_many."s");
@@ -398,7 +399,6 @@ class Morm
             {
                 $dummy = new $previous_class();
                 $dummy->setFromArray($to_set);
-                $dummy->save();
             }
         }
         else
@@ -407,8 +407,12 @@ class Morm
             $f_key = $this->getForeignKeyForRefOn($has_many, $class_name);
             $dummy = new $class_name($foreign_key_value);
             $dummy->$f_key = $this->{$this->_pkey};
-            $dummy->save();
         }
+        //TODO this is a workaround, to prevent save from failing when $this is not yet saved either
+        //it should maybe be stored to be saved after $this is effectively saved
+        if(!is_null($dummy) && !$this->isNew())
+            $dummy->save();
+        return $dummy;
     }
 
     public function isFilter ($filter)
@@ -557,10 +561,11 @@ class Morm
         foreach($this->getTableDesc() as $field_name => $field_desc)
         {
             $morm_name = isset($to_load[$field_name]) ? $field_name : implode(MormConf::MORM_SEPARATOR, array(MormConf::MORM_PREFIX, $super_class, $field_name));
-            if(isset($to_load[$morm_name]))
+            if(array_key_exists($morm_name, $to_load))
             {
                     $this->_original[$field_name] = $to_load[$morm_name];
-                    settype($this->_original[$field_name], $field_desc->php_type);
+                    if(!is_null($this->_original[$field_name]))
+                        settype($this->_original[$field_name], $field_desc->php_type);
                     $this->_fields[$field_name] = $this->_original[$field_name]; 
             }
         }
@@ -1982,7 +1987,7 @@ class Morm
         {
             if(isset($to_load[$sti_field]) && !empty($to_load[$sti_field]))
             {
-                $sti_class = MormConf::getClassName($to_load[$sti_field], $model->_table);
+                $sti_class = MormConf::getClassName($to_load[$sti_field], MormDummy::get($class)->_table);
                 $sti_model = new $sti_class();
                 if($sti_model->is_a($super_class) || MormDummy::get($super_class)->is_a($sti_model))
                 {
