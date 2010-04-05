@@ -8,10 +8,10 @@ foreach($this->sources as $source) {
     ?>
 
 #############################################################################
-## data source definition for <?php echo $source->name."\n"; ?>
+## data source definition for <?php echo $source->index_name."\n"; ?>
 #############################################################################
 
-source <?php echo $source->name; ?>
+source <?php echo $source->index_name; ?>
 
 {
 	type					= <?php echo $source->type."\n"; ?>
@@ -54,21 +54,21 @@ source <?php echo $source->name; ?>
 
 
 #############################################################################
-## index definition for <?php echo $source->name."\n"; ?>
+## index definition for <?php echo $source->index_name."\n"; ?>
 #############################################################################
 
 # this is an index which is stored locally in the filesystem
 #
-index <?php echo $source->name; ?>_index
+index <?php echo $source->index_name; ?>_index
 {
 	# document source(s) to index
 	# multi-value, mandatory
 	# document IDs must be globally unique across all sources
-	    source			= <?php echo $source->name."\n"; ?>
+	    source			= <?php echo $source->index_name."\n"; ?>
 
 	# index files path and file name, without extension
 	# mandatory, path must be writable, extensions will be auto-appended
-	path			= <?php echo $this->global_conf['index_dir'] ?>/<?php echo $source->name; ?>_index
+	path			= <?php echo $this->global_conf['index_dir'] ?>/<?php echo $source->index_name; ?>_index
 
 	# document attribute values (docinfo) storage mode
 	# optional, default is 'extern'
@@ -126,10 +126,10 @@ index <?php echo $source->name; ?>_index
 	html_strip				= 1
 }
 
-index <?php echo $source->name; ?>_index_d
+index <?php echo $source->index_name; ?>_index_d
 {
   type = distributed
-  local = <?php echo $source->name; ?>_index
+  local = <?php echo $source->index_name; ?>_index
 }
 
 <?php 

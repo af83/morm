@@ -4,8 +4,6 @@ Class Cerbere extends Mormons
 {
     private $keyword = null;
 
-    private $base_class = null;
-
     private $sphinx_search = null;
     private $sphinx_results = null;
     private $sphinx_args = null;
@@ -14,9 +12,15 @@ Class Cerbere extends Mormons
     public function __construct($init, $keyword)
     {
         $this->keyword = $this->add_joker($keyword);
-        parent::__construct($init);
-        $this->base_class = get_class($this->base_models[$this->base_table]);
-        $this->sphinx_args['conf'] = array('index' => $this->base_class.'_index');
+        $class = $init;
+        $index = '';
+        if(is_array($init))
+        {
+            $class = key($init);
+            $index = '_'.$init[$class];
+        }
+        parent::__construct($class);
+        $this->sphinx_args['conf'] = array('index' => $this->base_class.$index.'_index');
     }
 
     public function paginate($page, $per_page)
@@ -60,7 +64,7 @@ Class Cerbere extends Mormons
 
     public function executeSphinxQuery()
     {
-        $this->sphinx_search = new sphinx_MorphinxSearch($this->sphinx_args);
+        $this->sphinx_search = new MorphinxSearch($this->sphinx_args);
         $this->sphinx_results = $this->sphinx_search->search($this->keyword);
         if(!$this->sphinx_results)
         {
@@ -141,7 +145,7 @@ Class Cerbere extends Mormons
 
     public function add_joker($keystring)
     {
-        $newkeystring = str_replace(' ', '* ', fix_quoting_mysql($keystring)) . '*';
+        $newkeystring = str_replace(' ', '* ', mysql_real_escape_string($keystring)) . '*';
         return $newkeystring;
     }
 }

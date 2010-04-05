@@ -2147,8 +2147,10 @@ class Morm
         return json_encode($this->toObj($opts));
     }
 
-    public function getMorphinxIndex()
+    public function getMorphinxIndex($index=null)
     {
+        if(!is_null($index) && isset($this->indexes[$index]))
+            return $this->indexes[$index];
         return $this->index;
     }
 

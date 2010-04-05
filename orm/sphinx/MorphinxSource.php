@@ -4,6 +4,8 @@ class MorphinxSource
 {
     public $name;
 
+    public $index_name;
+
     public $pre_queries = array();
 
     public $fetch_query = '';
@@ -16,12 +18,16 @@ class MorphinxSource
 
     private $model;
 
+    private $index_def;
+
     public $type = 'mysql';
 
-    public function __construct($model_name)
+    public function __construct($model_name, $index = null)
     {
         $this->name = $model_name;
+        $this->index_name = $this->name;
         $this->model = MormDummy::get($model_name);
+        $this->setIndexDef($index);
         $this->setSqlConf();
         $this->setSqlPreQueries();
         $this->setFetchQuery();
@@ -35,15 +41,21 @@ class MorphinxSource
         return $this->model;
     }
 
+    public function setIndexDef($index = null)
+    {
+        if(!is_null($index)) $this->index_name .= '_'.$index;
+        $this->index_def = $this->model->getMorphinxIndex($index);
+    }
+
     private function setSqlConf()
     {
-        //FIXME find a better way to get the conf, this one is sooooo bad
-        $config = array();
+        $conf = Config::instance(); 
+        $config = $conf['db'];
 
-        $this->sql_host = $config['dbserver'];
-        $this->sql_user = $config['dbuser'];
-        $this->sql_pass = $config['dbpass'];
-        $this->sql_db = $config['dbname']; 
+        $this->sql_host = $config['DB_HOST'];
+        $this->sql_user = $config['DB_USER'];
+        $this->sql_pass = $config['DB_PASSWORD'];
+        $this->sql_db = $config['DB_NAME']; 
         $this->sql_port = 3306; //TODO get from conf
     }
 
@@ -72,7 +84,7 @@ class MorphinxSource
 
     private function setAttributes()
     {
-        $index = $this->model->getMorphinxIndex();
+        $index = $this->index_def;
         /**
          * always want to have these attributes 
          */
@@ -112,7 +124,7 @@ class MorphinxSource
 
     private function getAttributeTable($attr_name)
     {
-        $index = $this->model->getMorphinxIndex();
+        $index = $this->index_def;
         foreach($index['fields'] as $key => $value)
         {
             if(!is_numeric($key))
@@ -134,7 +146,7 @@ class MorphinxSource
 
     private function getSelectedFields()
     {
-        $index = $this->model->getMorphinxIndex();
+        $index = $this->index_def;
         $ret = array();
         $fields = $index['fields'];
         foreach($fields as $key => $value)
@@ -155,7 +167,7 @@ class MorphinxSource
 
     private function buildJoins()
     {
-        $index = $this->model->getMorphinxIndex();
+        $index = $this->index_def;
         $ret = array();
         foreach($index['fields'] as $key => $value)
         {
@@ -169,7 +181,7 @@ class MorphinxSource
 
     private function getSqlJoins()
     {
-        $index = $this->model->getMorphinxIndex();
+        $index = $this->index_def;
         if(isset($index['sql_joins']))
             return $index['sql_joins'];
         return '';
@@ -177,7 +189,7 @@ class MorphinxSource
 
     private function getConditions()
     {
-        $index = $this->model->getMorphinxIndex();
+        $index = $this->index_def;
         if(isset($index['conditions']))
             return $index['conditions'];
         return array();
@@ -185,7 +197,7 @@ class MorphinxSource
 
     private function getSqlConditions()
     {
-        $index = $this->model->getMorphinxIndex();
+        $index = $this->index_def;
         $sql_conditions = array("`".$this->name."`.`".$this->model->getPkey().'` >= $start', 
                                 "`".$this->name."`.`".$this->model->getPkey().'` <= $end');
         if(isset($index['sql_conditions']))
