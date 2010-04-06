@@ -8,19 +8,33 @@ Class Cerbere extends Mormons
     private $sphinx_results = null;
     private $sphinx_args = null;
     private $_sphinx_executed = false;
+    private $index_def = null;
 
     public function __construct($init, $keyword)
     {
         $this->keyword = $this->add_joker($keyword);
         $class = $init;
         $index = '';
+        $index_to_set = null;
         if(is_array($init))
         {
             $class = key($init);
             $index = '_'.$init[$class];
+            $index_to_set = $init[$class];
         }
-        parent::__construct($class);
-        $this->sphinx_args['conf'] = array('index' => $this->base_class.$index.'_index');
+        $class = class_exists($class) && is_subclass_of($class, 'Morm') ? $class : MormConf::getClassName($class);
+        $this->addClass($class);
+        $this->base_class = $class;
+        $this->base_object = MormDummy::get($this->base_class);
+        $this->setIndexDef($index_to_set);
+        $this->manageStiConds();
+        $index = $this->base_class.$index.'_index';
+        $this->sphinx_args['conf'] = array('index' => $index);
+    }
+
+    public function setIndexDef($index = null)
+    {
+        $this->index_def = $this->base_object->getMorphinxIndex($index);
     }
 
     public function paginate($page, $per_page)
@@ -41,7 +55,7 @@ Class Cerbere extends Mormons
 
     public function conditions($conditions)
     {
-        $index = $this->base_object->getMorphinxIndex();
+        $index = $this->index_def;
         foreach($conditions as $field => $condition)
         {
             /**
@@ -122,7 +136,7 @@ Class Cerbere extends Mormons
 
     public function getMorphinxTableForField($field)
     {
-        $index = $this->base_object->getMorphinxIndex();
+        $index = $this->index_def;
         foreach($index['fields'] as $key => $value)
         {
             if(!is_numeric($key))

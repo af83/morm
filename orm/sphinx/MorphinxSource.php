@@ -189,10 +189,13 @@ class MorphinxSource
 
     private function getConditions()
     {
+        $conditions = array();
+        if($sti_field = $this->model->getStiField()) // there is an sti, we should now add a condition
+            $conditions = array($this->name => array($sti_field => $this->model->getStiValue()));
         $index = $this->index_def;
         if(isset($index['conditions']))
-            return $index['conditions'];
-        return array();
+            return array_merge($conditions, $index['conditions']);
+        return $conditions;
     }
 
     private function getSqlConditions()

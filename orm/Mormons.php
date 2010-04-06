@@ -360,7 +360,7 @@ class Mormons implements Iterator, Countable, ArrayAccess
         }
     }
 
-    private function addClass($class)
+    protected function addClass($class)
     {
         if($this->isUsedClass($class)) throw new Exception("The class ".$class." already exists in this object");
         $dummy = MormDummy::get($class);

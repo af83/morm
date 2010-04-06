@@ -40,7 +40,7 @@ class MorphinxIndexer
                 }
             }
             else{
-                $this->sources []= $this->getSourceFromModel($model_name);
+                $this->sources []= $this->getSourceFromModel($index);
                 $this->sources_count++;
             }
         }
