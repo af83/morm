@@ -19,6 +19,8 @@ class MormJoin
     private $first_belongs_to_second = false;
     private $second_belongs_to_first = false;
 
+    private $conditions = array();
+
     public function __construct($first, $second, Array $opts = array())
     {
         $this->loadObject('first', $first);
@@ -50,6 +52,7 @@ class MormJoin
         $this->source = isset($opts['source']) ? $opts['source'] : null;
         $this->referer = isset($opts['referer']) ? $opts['referer'] : null;
         $this->load = isset($opts['load']) && is_bool($opts['load']) ? $opts['load'] : true;
+        isset($opts['conditions']) ? $this->setConditions($opts['conditions']) : array();
         $this->class_from_field_value = isset($opts['class_from_field_value']) ? $opts['class_from_field_value'] : array();
         $this->setSource();
         $this->setReferer();
@@ -202,6 +205,33 @@ class MormJoin
     public function getReferer()
     {
         return $this->referer;
+    }
+
+    public function setConditions($conds)
+    {
+        $conditions = array();
+        foreach($conds as $field => $cond)
+        {
+            if($field == $this->first_class || $field == $this->second_class)
+            {
+                $class = $field;
+                $condition = $cond;
+            }
+            else
+            {
+                $class = $this->second_class;
+                $condition = array($field => $cond);
+            }
+            if(!isset($conditions[$class]))
+                $conditions[$class] = array();
+            $conditions[$class] = array_merge($conditions[$class], $condition);
+        }
+        $this->conditions = $conditions;
+    }
+
+    public function getConditions()
+    {
+        return $this->conditions;
     }
 
     public function needToload()

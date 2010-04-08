@@ -109,14 +109,33 @@ class SqlBuilder
 
     static function singleJoin($join)
     {
-        return sprintf(" %s JOIN `%s` AS `%s` ON `%s`.`%s`=`%s`.`%s` ", 
+        return sprintf(" %s JOIN `%s` AS `%s` ON `%s`.`%s`=`%s`.`%s` %s ", 
                        $join->getDirection(),
                        $join->getSecondObj()->getTable(),
                        $join->getSecondTableAlias(),
                        $join->getFirstTableAlias(),
                        $join->getFirstKey(),
                        $join->getSecondTableAlias(),
-                       $join->getSecondKey());
+                       $join->getSecondKey(),
+                       self::joinConditions($join->getConditions()));
+    }
+
+    static function joinConditions($conditions)
+    {
+        if(empty($conditions))
+            return '';
+        $sql = array();
+        foreach($conditions as $class => $condition)
+        {
+            if(is_array($condition))
+            {
+                foreach($condition as $k => $cond)
+                    $where[] = self::singleWhere($class, array($k => $cond));
+            }
+            else
+                $where[] = self::singleWhere($class, $condition);
+        }
+        return ' AND '.implode(' AND ', $where);
     }
 
     static function where($conditions, $sql_where='')
