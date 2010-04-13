@@ -719,12 +719,8 @@ class Mormons implements Iterator, Countable, ArrayAccess
         }
 
         $this->lookForClassFromFieldToSet($conds);
-        $diffs = array_diff_assoc($conds, $this->where[$class]);
-        if(!empty($diffs))//FIXME WTF is this diff here for ?
-        {
-            $this->where[$class] = array_merge($this->where[$class], $conds);
-            $this->resetFlags();
-        }
+        $this->where[$class] = array_merge($this->where[$class], $conds);
+        $this->resetFlags();
         return $this;
     }
 
