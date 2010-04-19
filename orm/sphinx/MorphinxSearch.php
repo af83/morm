@@ -63,7 +63,7 @@ class MorphinxSearch
         {
             $offset = isset($this->args['pagination'][0]) ? $this->args['pagination'][0] : 0;
             $limit = isset($this->args['pagination'][1]) ? $this->args['pagination'][1] : 20;
-            $this->client->SetLimits($offset, $limit, 10000);
+            $this->client->SetLimits($offset, $limit);
         }
         if(isset($this->args['weights']))
             $this->client->SetFieldWeights( $this->args['weights'] );
