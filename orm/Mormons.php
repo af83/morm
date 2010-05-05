@@ -268,6 +268,8 @@ class Mormons implements Iterator, Countable, ArrayAccess
                 $sources_info = isset($stmt['source']) ? $stmt : $dummy->findSourceFor($base_obj);//this may throw an Exception if no source could be found
                 $ft_key = $dummy->getForeignKeyFor($sources_info['source']);
                 $this->add_conditions(array($ft_key => $base_obj->{$base_obj->getPKey()}), $using_class);
+                if(isset($opts['conditions']))
+                    $this->add_conditions($opts['conditions'], $using_class);
             }
         }
         else
