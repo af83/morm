@@ -89,7 +89,7 @@ class Mormons implements Iterator, Countable, ArrayAccess
      */
     private $limit = null;
 
-    private $per_page = 42;
+    protected $per_page = 42;
 
     private $lazy_load = null;
     

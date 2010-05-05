@@ -41,6 +41,7 @@ Class Cerbere extends Mormons
     {
         $offset = ( intval($page) - 1 ) * $per_page;
         $this->sphinx_args['pagination'] = array($offset, $per_page);
+        $this->per_page = $per_page;
     }
 
     public function offset($offset)
