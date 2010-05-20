@@ -101,4 +101,9 @@ class MorphinxSearch
         //$this->client->SetRankingMode ( $conf['ranker'] );
     }
 
+    public function getClient()
+    {
+        return $this->client;
+    }
+
 }

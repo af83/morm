@@ -83,8 +83,7 @@ Class Cerbere extends Mormons
         $this->sphinx_results = $this->sphinx_search->search($this->keyword);
         if(!$this->sphinx_results)
         {
-            //TODO throw Exception with informations from sphinx
-            throw new Exception('Sphinx failed');
+            throw new Exception('Sphinx failed with message: '.$this->sphinx_search->getClient()->_error);
         }
         $this->_sphinx_executed = true;
     }
