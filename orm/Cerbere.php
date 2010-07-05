@@ -12,6 +12,7 @@ Class Cerbere extends Mormons
 
     public function __construct($init, $keyword)
     {
+        class_exists('SphinxClient');
         $this->keyword = $this->add_joker($keyword);
         $class = $init;
         $index = '';
@@ -70,11 +71,34 @@ Class Cerbere extends Mormons
             {
                 foreach($index['manual_attributes'] as $attr)
                 {
-                    if($attr['name'] == $field)
+                    if($attr['name'] == $field || in_array($field, explode(' ', $attr['name'])))//beuark very ugly thing
                         $this->setSphinxArg('conditions', array($field => $condition));
                 }
             }
         }
+    }
+
+    public function set_order($order, $alternate_class = null)
+    {
+        $index = $this->index_def;
+        if(isset($index['sortable']) && ($index['sortable'] == $order || is_array($index['sortable']) && in_array($order, $index['sortable'])))
+        {
+            $class = is_null($alternate_class) ? $this->base_class : $alternate_class;
+            $this->sphinx_args['sort_mode'] = array('mode' => SPH_SORT_ATTR_ASC,
+                                                    'field' => $class.'_'.$order.'_ord');
+        }
+        parent::set_order($order, $alternate_class);
+    }
+
+    public function set_order_dir($dir)
+    {
+        $dir = strtoupper($dir);
+        if(!in_array($dir, array('DESC', 'ASC'))) throw new Exception("The direction is suppose to be DESC or ASC (case insensitive)");
+        if(strtoupper($dir) == 'DESC')
+            $this->sphinx_args['sort_mode']['mode'] = SPH_SORT_ATTR_DESC;
+        else
+            $this->sphinx_args['sort_mode']['mode'] = SPH_SORT_ATTR_ASC;
+        parent::set_order_dir($dir);
     }
 
     public function executeSphinxQuery()
