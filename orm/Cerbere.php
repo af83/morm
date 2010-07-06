@@ -55,7 +55,7 @@ Class Cerbere extends Mormons
         $this->sphinx_args['pagination'][1] = intval($limit);
     }
 
-    public function conditions($conditions)
+    public function conditions($conditions, $alternate_class = null)
     {
         $index = $this->index_def;
         foreach($conditions as $field => $condition)
@@ -67,12 +67,34 @@ Class Cerbere extends Mormons
             {
                 $this->setSphinxArg('conditions', array($this->getMorphinxFieldName($field) => $condition));
             }
-            if(isset($index['manual_attributes']))
+            if(is_null($alternate_class) && isset($index['manual_attributes']))
             {
                 foreach($index['manual_attributes'] as $attr)
                 {
-                    if($attr['name'] == $field || in_array($field, explode(' ', $attr['name'])))//beuark very ugly thing
+                    if($attr['name'] == $field)
                         $this->setSphinxArg('conditions', array($field => $condition));
+                }
+            }
+            if(!is_null($alternate_class) && isset($index['with']))
+            {
+                $with = is_array($index['with']) ? $index['with'] : array($index['with']);
+                foreach($with as $has_many => $values)
+                {
+                    if(is_numeric($has_many))
+                    {
+                        $has_many = $values;
+                        $values = array();
+                    }
+                    $f_class = $this->base_object->getForeignMormonsClass($has_many);
+                    if($alternate_class == $f_class)
+                    {
+                        if(isset($values['key']))
+                            $f = $values['key'];
+                        else
+                            $f = MormDummy::get($f_class)->getPkey();
+                        if($field == $f)
+                            $this->setSphinxArg('conditions', array($has_many.'_'.$f => $condition));
+                    }
                 }
             }
         }
@@ -97,7 +119,7 @@ Class Cerbere extends Mormons
         if(strtoupper($dir) == 'DESC')
             $this->sphinx_args['sort_mode']['mode'] = SPH_SORT_ATTR_DESC;
         else
-            $this->sphinx_args['sort_mode']['mode'] = SPH_SORT_ATTR_ASC;
+            $this->sphinx_args['sort_mode']['mode'] = 0;
         parent::set_order_dir($dir);
     }
 

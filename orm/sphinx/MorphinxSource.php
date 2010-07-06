@@ -20,6 +20,8 @@ class MorphinxSource
 
     private $index_def;
 
+    private $group_by = null;
+
     public $type = 'mysql';
 
     public function __construct($model_name, $index = null)
@@ -71,10 +73,14 @@ class MorphinxSource
                         "'".$this->name."' as `class_".$this->name."`, ".
                         '`'.$this->name."`.`".$this->model->getPkey()."` as `".$this->name."_id`, ".
                         SqlBuilder::select($this->getSelectedFields()).
+                        $this->getSortableAttrFields().
+                        $this->getWithAttrFields().
                         " FROM ".SqlBuilder::from(array($this->name => $this->model->_table)).
                         SqlBuilder::joins($this->buildJoins())." ".
+                        $this->getWithSqlJoins()." ".
                         $this->getSqlJoins()." ".
-                        SqlBuilder::where($this->getConditions(), $this->getSqlConditions()));
+                        SqlBuilder::where($this->getConditions(), $this->getSqlConditions())).' '.
+                        SqlBuilder::group_by($this->getGroupBy());
     }
 
     private function setQueryRange()
@@ -92,6 +98,15 @@ class MorphinxSource
 
         $this->attributes []= array('name' => $this->name.'_id', 
                                     'type' => 'sql_attr_uint');
+        $this->setDefinedAttributes();
+        $this->setSortableAttributes();
+        $this->setManualAttributes();
+        $this->setWithAttributes();
+    }
+
+    private function setDefinedAttributes()
+    {
+        $index = $this->index_def;
         if (isset($index['attributes']))
         {
             foreach($index['attributes'] as $attr_name)
@@ -103,9 +118,55 @@ class MorphinxSource
                                       );
             }
         }
+    }
+
+    private function setSortableAttributes()
+    {
+        $index = $this->index_def;
+        if (isset($index['sortable'])) 
+        {
+            $sortable = is_array($index['sortable']) ? $index['sortable'] : array($index['sortable']); 
+            foreach($sortable as $key => $attr_name)
+            {
+                $table = is_numeric($key) ? $this->name : $key; 
+                $this->attributes []= array(
+                                      'name' => $table.'_'.$attr_name.'_ord',
+                                      'type' => 'sql_attr_str2ordinal'
+                                      );
+            }
+        }
+    }
+
+    private function setManualAttributes()
+    {
+        $index = $this->index_def;
         if (isset($index['manual_attributes'])) 
         {
             $this->attributes = array_merge($this->attributes, $index['manual_attributes']);
+        }
+    }
+
+    private function setWithAttributes()
+    {
+        $index = $this->index_def;
+        if(!isset($index['with'])) return '';
+        $with = is_array($index['with']) ? $index['with'] : array($index['with']);
+        $ret = array();
+        foreach($with as $has_many => $values)
+        {
+            if(is_numeric($has_many))
+            {
+                $has_many = $values;
+                $values = array();
+            }
+            //$has_many_stmt = $this->model->getHasManyStatement($has_many);
+            if(isset($values['key']))
+                $field = $values['key'];
+            else
+                $field = MormDummy::get($this->model->getForeignMormonsClass($has_many))->getPkey();
+            $attr_alias = $has_many.'_'.$field;
+            $this->attributes []= array('name' => sprintf("uint %s from field", $attr_alias),
+                                        'type' => 'sql_attr_multi');
         }
     }
 
@@ -144,6 +205,46 @@ class MorphinxSource
     {
     }
 
+    private function getSortableAttrFields()
+    {
+        $index = $this->index_def;
+        if(!isset($index['sortable'])) return '';
+        $ret = array();
+        $fields = is_array($index['sortable']) ? $index['sortable'] : array($index['sortable']); 
+        foreach($fields as $key => $attr_name)
+        {
+            $table = is_numeric($key) ? $this->name : $key; 
+            $ret[] = 'UPPER('.$table.'.'.$attr_name.') as `'.$table.'_'.$attr_name.'_ord`';
+        }
+        return empty($ret) ? '' : ', '.implode(', ', $ret);
+    }
+
+    private function getWithAttrFields()
+    {
+        $index = $this->index_def;
+        if(!isset($index['with'])) return '';
+        $with = is_array($index['with']) ? $index['with'] : array($index['with']);
+        $ret = array();
+        foreach($with as $has_many => $values)
+        {
+            $this->setGroupBy();
+            if(is_numeric($has_many))
+            {
+                $has_many = $values;
+                $values = array();
+            }
+            //$has_many_stmt = $this->model->getHasManyStatement($has_many);
+            if(isset($values['key']))
+                $field = $values['key'];
+            else
+                $field = MormDummy::get($this->model->getForeignMormonsClass($has_many))->getPkey();
+            $table_alias = $has_many;
+            $attr_alias = $table_alias.'_'.$field;
+            $ret []= sprintf(" GROUP_CONCAT(DISTINCT IFNULL(%s.%s, '0') SEPARATOR ',') AS `%s` ", $table_alias, $field, $attr_alias);
+        }
+        return is_array($ret) ? ','.implode(",", $ret) : '';
+    }
+
     private function getSelectedFields()
     {
         $index = $this->index_def;
@@ -179,6 +280,34 @@ class MorphinxSource
         return $ret;
     }
 
+    private function getWithSqlJoins()
+    {
+        $index = $this->index_def;
+        if(!isset($index['with'])) return '';
+        $with = is_array($index['with']) ? $index['with'] : array($index['with']);
+        $ret = array();
+        foreach($with as $has_many => $values)
+        {
+            if(is_numeric($has_many))
+            {
+                $has_many = $values;
+                $values = array();
+            }
+            $f_class = $this->model->getForeignMormonsClass($has_many);
+            $j = new MormJoin(get_class($this->model), $f_class);
+            $ret []= sprintf(" %s JOIN `%s` AS `%s` ON `%s`.`%s`=`%s`.`%s` %s ", 
+                             $j->getDirection(),
+                             $j->getSecondObj()->getTable(),
+                             $has_many,
+                             $j->getFirstTableAlias(),
+                             $j->getFirstKey(),
+                             $has_many,
+                             $j->getSecondKey(),
+                             sqlBuilder::joinConditions($j->getConditions()));
+        }
+        return implode("\n", $ret);
+    }
+
     private function getSqlJoins()
     {
         $index = $this->index_def;
@@ -206,5 +335,29 @@ class MorphinxSource
         if(isset($index['sql_conditions']))
             $sql_conditions = array_merge($sql_conditions, $index['sql_conditions']);
         return implode(' AND ', $sql_conditions);
+    }
+
+    private function getGroupBy()
+    {
+        $index = $this->index_def;
+        if(is_null($this->group_by))
+        {
+            if(isset($index['group']))
+            {
+                if(is_array($index['group']))
+                    $this->group_by = $index['group'];
+                else
+                    $this->group_by = array($this->name => $index['group']);
+            }
+        }
+        return $this->group_by;
+    }
+
+    private function setGroupBy()
+    {
+        if(is_null($this->group_by))
+        {
+            $this->group_by = array($this->name => $this->model->getPkey());
+        }
     }
 }
